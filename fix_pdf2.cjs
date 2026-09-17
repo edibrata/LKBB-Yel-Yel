@@ -1,7 +1,9 @@
 const fs = require('fs');
 let content = fs.readFileSync('src/pages/AdminDashboard.tsx', 'utf8');
 
-const generatePdfRegex = /const generateDetailPDF = \(participant: any, detailScores: ScoreRecord\[\], autoDownload = true, docParam\?: jsPDF\) => \{[\s\S]*?if \(autoDownload\) \{\s*doc\.save\(`Nilai_LKBB_\$\{participant\.number\}_\$\{participant\.name\}\.pdf`\);\s*\}\s*\};\s*/;
+const lines = content.split('\n');
+const startIdx = lines.findIndex(l => l.includes('const generateDetailPDF = (participant: any, detailScores: ScoreRecord[], autoDownload = true, docParam?: jsPDF) => {'));
+const endIdx = lines.findIndex((l, idx) => idx > startIdx && l.includes('  };;;'));
 
 const newGeneratePdf = `
   const generateDetailPDF = (participant: any, detailScores: ScoreRecord[], autoDownload = true, docParam?: jsPDF) => {
@@ -69,8 +71,8 @@ const newGeneratePdf = `
       tableData.push([
         { content: group.title, colSpan: 3, styles: { fontStyle: 'bold', fillColor: [240, 240, 240], cellPadding: 2 } }
       ]);
-      const groupCriteria = criteriaDef.filter(c => c.id.startsWith(group.prefix));
-      groupCriteria.forEach((crit, index) => {
+      const groupCriteria = criteriaDef.filter((c: any) => c.id.startsWith(group.prefix));
+      groupCriteria.forEach((crit: any, index: number) => {
         tableData.push([
           { content: \`\${groupCriteria.length > 1 ? (index + 1) + '. ' : ''}\${crit.name}\\n \${crit.desc}\`, styles: { cellPadding: { left: 5, top: 1, bottom: 1, right: 1.5 } } },
           { content: s1?.criteriaScores?.[crit.id] ?? '-', styles: { halign: 'center', valign: 'middle', fontStyle: 'bold', cellPadding: 1.5 } },
@@ -112,42 +114,24 @@ const newGeneratePdf = `
     });
 
     if (autoDownload) {
-      doc.save(\`Nilai_LKBB_\${participant.number}_\${participant.name}.pdf\`);
+      const now = new Date();
+      const pad = (n: number) => String(n).padStart(2, '0');
+      const timeStr = \`\${now.getFullYear()}\${pad(now.getMonth() + 1)}\${pad(now.getDate())} \${pad(now.getHours())}.\${pad(now.getMinutes())}.\${pad(now.getSeconds())}\`;
+      const cleanName = participant.name.replace(/[^a-zA-Z0-9 ]/g, '');
+      const filename = \`LKBB dan Yel-Yel Nilai Rinci \${participant.number} \${participant.category} \${cleanName} \${timeStr}.pdf\`;
+      doc.save(filename);
     }
   };
 `;
 
-content = content.replace(generatePdfRegex, newGeneratePdf);
+if (startIdx !== -1 && endIdx !== -1) {
+    lines.splice(startIdx, endIdx - startIdx, newGeneratePdf);
+} else {
+    // try different end line
+    const endIdx2 = lines.findIndex((l, idx) => idx > startIdx && l.includes('  const exportSemuaNilaiRinci = () => {'));
+    if (endIdx2 !== -1) {
+       lines.splice(startIdx, endIdx2 - startIdx, newGeneratePdf);
+    }
+}
 
-// There is another loop starting at line ~1149 setting calculating avgRaw inside the general table view
-// let's replace that table row grouping logic with this standard validScores logic too
-
-let regex2 = /let juri1Total = 0;\s*let juri2Total = 0;\s*let timePenalty = 0;\s*const validScores = pScores\.filter\(s => !s\.isDisqualified\);\s*juri1Total = validScores\[0\]\?\.totalScore \|\| 0;\s*juri2Total = validScores\[1\]\?\.totalScore \|\| 0;\s*const validTimer = Math\.min\(\.\.\.pScores\.map\(s => s\.timerSeconds \|\| 0\)\.filter\(t => t > 0\)\);\s*if \(validTimer > 300 && validTimer !== Infinity\) \{\s*let excess = validTimer - 300;\s*timePenalty = excess \* \(5 \/ 60\);\s*\}/g;
-
-const tableReplacement = `let juri1Total = 0;
-        let juri2Total = 0;
-        let timePenalty = 0;
-        
-        const validScores = pScores.filter(s => !s.isDisqualified);
-        juri1Total = validScores[0]?.totalScore || 0;
-        juri2Total = validScores[1]?.totalScore || 0;
-        
-        const timers = validScores.map(s => s.timerSeconds || 0).filter(t => t > 0);
-        let validTimer = timers.length > 0 ? Math.min(...timers) : 0;
-        if (validTimer > 300) {
-          timePenalty = (validTimer - 300) * (5 / 60);
-        }
-        
-        let avgRaw = 0;
-        if (validScores[0] && validScores[1]) {
-           avgRaw = juri1Total + juri2Total;
-        } else if (validScores[0]) {
-           avgRaw = juri1Total;
-        } else if (validScores[1]) {
-           avgRaw = juri2Total;
-        }
-`;
-
-content = content.replace(regex2, tableReplacement);
-
-fs.writeFileSync('src/pages/AdminDashboard.tsx', content);
+fs.writeFileSync('src/pages/AdminDashboard.tsx', lines.join('\n'));

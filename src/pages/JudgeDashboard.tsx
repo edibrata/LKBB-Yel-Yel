@@ -33,16 +33,9 @@ export function JudgeDashboard() {
   const [scoredParticipants, setScoredParticipants] = useState<Set<string>>(new Set());
   const [disqualifiedParticipants, setDisqualifiedParticipants] = useState<Set<string>>(new Set());
   const [alertParticipant, setAlertParticipant] = useState<Participant | null>(null);
-  const [selectedPost, setSelectedPost] = useState<number>(1);
   const [confirmParticipant, setConfirmParticipant] = useState<Participant | null>(null);
   const [isDisqualifying, setIsDisqualifying] = useState(false);
 
-  useEffect(() => {
-    // Allows switching post for testing/flexibility if needed, but only for admins
-    if (user?.uid && user.appRole === 'admin') {
-      updateDoc(doc(db, 'users', user.uid), { post: selectedPost }).catch(console.error);
-    }
-  }, [selectedPost, user?.uid, user?.appRole]);
 
   useEffect(() => {
     const q = query(collection(db, 'participants'), orderBy('number'));
@@ -69,7 +62,7 @@ export function JudgeDashboard() {
       const disqualified = new Set<string>();
       snapshot.docs.forEach(doc => {
         const data = doc.data();
-        if (data.judgeId === user.uid && data.post === selectedPost) {
+        if (data.judgeId === user.uid) {
           if (data.isDisqualified) {
             disqualified.add(data.participantId);
           } else {
@@ -83,7 +76,7 @@ export function JudgeDashboard() {
       console.error("Firestore onSnapshot error (scores):", error);
     });
     return unsubscribe;
-  }, [user, selectedPost]);
+  }, [user]);
 
   const filteredParticipants = participants.filter(p => {
     const matchesSearch = p.number.includes(search);
@@ -96,13 +89,12 @@ export function JudgeDashboard() {
     if (!user) return;
     setIsDisqualifying(true);
     try {
-      const docId = `${participant.id}_${user.uid}_${activePost}`;
-      localStorage.removeItem(`draft_score_${user.uid}_${participant.id}_${activePost}`);
+      const docId = `${participant.id}_${user.uid}`;
+      localStorage.removeItem(`draft_score_${user.uid}_${participant.id}`);
       const scoreRef = doc(db, 'scores', docId);
       setDoc(scoreRef, {
         participantId: participant.id,
         judgeId: user.uid,
-        post: activePost,
         totalScore: 0,
         criteriaScores: {},
         updatedAt: new Date().toISOString(),
@@ -114,7 +106,7 @@ export function JudgeDashboard() {
         user.uid,
         user.appRole,
         'Diskualifikasi Peserta', 
-        `Peserta ${participant.number} (Kategori: ${participant.category}) di Pos ${activePost}`
+        `Peserta ${participant.number} (Kategori: ${participant.category}) diskualifikasi`
       );
       setConfirmParticipant(null);
     } catch (error) {
@@ -124,7 +116,6 @@ export function JudgeDashboard() {
     }
   };
 
-  const activePost = selectedPost;
 
   // Get available categories for the judge
   const availableCategories = user?.appRole === 'judge' && user.assignedCategories && user.assignedCategories.length > 0
@@ -214,7 +205,7 @@ export function JudgeDashboard() {
                   if (isDisqualified) {
                     setAlertParticipant(p);
                   } else if (isScored) {
-                    navigate(`/judge/scoring/${p.id}?post=${activePost}`);
+                    navigate(`/judge/scoring/${p.id}`);
                   } else {
                     setConfirmParticipant(p);
                   }
@@ -273,7 +264,7 @@ export function JudgeDashboard() {
                 variant="default" 
                 onClick={() => {
                   setConfirmParticipant(null);
-                  navigate(`/judge/scoring/${confirmParticipant.id}?post=${activePost}`);
+                  navigate(`/judge/scoring/${confirmParticipant.id}`);
                 }}
                 disabled={isDisqualifying}
               >

@@ -6,8 +6,8 @@ import { logActivity } from '../lib/activityLogger';
 export interface AppUser {
   uid: string; // username
   appRole: 'super_admin' | 'admin' | 'admin_leaderboard' | 'judge';
-  post?: number;
-  posts?: number[];
+
+
   assignedCategories?: string[];
   originalRole?: 'super_admin' | 'admin';
   originalUid?: string;
@@ -51,8 +51,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setUser({
                 uid: parsedUser.uid,
                 appRole: data.role || 'judge',
-                post: data.post,
-                posts: data.posts,
+
+
                 assignedCategories: data.assignedCategories || [],
                 originalRole: parsedUser.originalRole,
                 originalUid: parsedUser.originalUid

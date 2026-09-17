@@ -92,8 +92,8 @@ export function Login() {
                 loginCustom({
                   uid: foundId,
                   appRole: data.role,
-                  post: data.post,
-                  posts: data.posts,
+
+
                   assignedCategories: data.assignedCategories || []
                 }, rememberMe);
              } else {

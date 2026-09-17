@@ -5,7 +5,7 @@ import { collection, query, orderBy, onSnapshot, setDoc, doc, deleteDoc, updateD
 import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Input } from '../components/ui/input';
-import { CATEGORIES, SCORING_CRITERIA } from '../lib/constants';
+import { CATEGORIES, SCORING_CRITERIA, FLAT_CRITERIA } from '../lib/constants';
 import { Maximize, Minimize, LogOut, Download, Plus, Search, Check, AlertCircle, Upload, Users, UserCog, ClipboardList, Eye, EyeOff, Edit2, Trash2, FileText, Printer, FileDown, Trophy, Info, RotateCcw, X, BarChart3 } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { utils, writeFile, read } from 'xlsx';
@@ -24,7 +24,6 @@ interface Participant {
 interface ScoreRecord {
   id: string;
   participantId: string;
-  post: number;
   totalScore: number;
   finalScore?: number;
   timePenalty?: number;
@@ -38,8 +37,6 @@ interface AppUserDoc {
   id: string;
   email: string; // we'll use this for username
   role: string;
-  post?: number;
-  posts?: number[];
   assignedCategories?: string[];
   password?: string;
 }
@@ -111,9 +108,7 @@ export function AdminDashboard() {
     setTimeout(() => setLocalToast(null), 2500);
   };
 
-  const [newUserPost, setNewUserPost] = useState(1);
-  const [newUserPosts, setNewUserPosts] = useState<number[]>([1]);
-  const [newUserCategories, setNewUserCategories] = useState<string[]>([]);
+      const [newUserCategories, setNewUserCategories] = useState<string[]>([]);
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(null);
   const [participantToDelete, setParticipantToDelete] = useState<string | null>(null);
@@ -121,7 +116,7 @@ export function AdminDashboard() {
   const [activeActionMenuId, setActiveActionMenuId] = useState<string | null>(null);
   const [participantForDetail, setParticipantForDetail] = useState<any>(null);
   const [participantToRestoreDisqualified, setParticipantToRestoreDisqualified] = useState<any>(null);
-  const [posToReset, setPosToReset] = useState<'all' | 1 | 2 | 3>('all');
+  const [judgeToReset, setJudgeToReset] = useState<string>('all');
   const [isResettingAll, setIsResettingAll] = useState(false);
   const [showTieBreakerInfo, setShowTieBreakerInfo] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -385,38 +380,32 @@ export function AdminDashboard() {
   };
 
   
-    const generateDetailPDF = (participant: any, detailScores: ScoreRecord[], autoDownload = true, docParam?: jsPDF) => {
+
+  const generateDetailPDF = (participant: any, detailScores: ScoreRecord[], autoDownload = true, docParam?: jsPDF) => {
     const doc = docParam || new jsPDF('p', 'mm', 'a4');
     
-    const startPage = (doc as any).internal.getNumberOfPages();
-    const checkPageBreak = (currentY: number, heightNeeded: number) => {
-      if (currentY + heightNeeded > 275) {
-        doc.addPage();
-        return 15;
-      }
-      return currentY;
-    };
+    const validScores = detailScores.filter(s => !s.isDisqualified);
+    const s1 = validScores[0];
+    const s2 = validScores[1];
 
-    let totalAll = 0;
-    detailScores.forEach(s => { if (!s.isDisqualified) totalAll += s.totalScore; });
-
-    // Determine penalties and final totals
-    const p1 = detailScores.find(s => Number(s.post) === 1);
-    const p2 = detailScores.find(s => Number(s.post) === 2);
-    const raw1 = p1?.totalScore || 0;
-    const raw2 = p2 ? (p2?.totalScore || 0) : raw1;
-    
-    const t1 = p1?.timerSeconds || 0;
-    const t2 = p2?.timerSeconds || 0;
     let validTimer = 0;
-    if (t1 > 0 && t2 > 0) validTimer = Math.min(t1, t2);
-    else if (t1 > 0) validTimer = t1;
-    else if (t2 > 0) validTimer = t2;
+    const timers = validScores.map(s => s.timerSeconds || 0).filter(t => t > 0);
+    if (timers.length > 0) validTimer = Math.min(...timers);
     
     const maxExcess = Math.max(0, validTimer - 300);
     const totalPenalty = maxExcess * (5 / 60);
+
+    const raw1 = s1?.totalScore || 0;
+    const raw2 = s2?.totalScore || 0;
     
-    const avgRaw = p2 ? (raw1 + raw2) / 2 : raw1;
+    let avgRaw = 0;
+    if (s1 && s2) {
+       avgRaw = raw1 + raw2; // sum actually
+    } else if (s1) {
+       avgRaw = raw1;
+    } else if (s2) {
+       avgRaw = raw2;
+    }
     const grandTotal = avgRaw - totalPenalty;
 
     doc.setFontSize(14);
@@ -432,7 +421,7 @@ export function AdminDashboard() {
     doc.text("Nilai Akhir", 14, 38); doc.text(`: ${Number.isInteger(grandTotal) ? grandTotal : Number(grandTotal).toFixed(2)}`, 45, 38);
 
     let currentY = 44;
-
+    
     const pdfGroups = [
       { title: "A. Kerapihan (10%)", prefix: "kerapihan_" },
       { title: "B. Gerakan di Tempat dan Berpindah Tempat (40%)", prefix: "gerakan_" },
@@ -440,10 +429,10 @@ export function AdminDashboard() {
       { title: "D. Ketepatan Waktu (10%)", prefix: "waktu_" }
     ];
 
-    const criteriaDef = SCORING_CRITERIA[1];
+    const criteriaDef = FLAT_CRITERIA;
     if (!criteriaDef) return;
 
-    if (p1?.isDisqualified || p2?.isDisqualified) {
+    if (detailScores.some(s => s.isDisqualified)) {
        doc.setFont("helvetica", "bold");
        doc.setTextColor(255, 0, 0);
        doc.text(`STATUS: DISKUALIFIKASI`, 14, currentY);
@@ -457,21 +446,20 @@ export function AdminDashboard() {
       tableData.push([
         { content: group.title, colSpan: 3, styles: { fontStyle: 'bold', fillColor: [240, 240, 240], cellPadding: 2 } }
       ]);
-      const groupCriteria = criteriaDef.filter(c => c.id.startsWith(group.prefix));
-      groupCriteria.forEach((crit, index) => {
+      const groupCriteria = criteriaDef.filter((c: any) => c.id.startsWith(group.prefix));
+      groupCriteria.forEach((crit: any, index: number) => {
         tableData.push([
           { content: `${groupCriteria.length > 1 ? (index + 1) + '. ' : ''}${crit.name}\n ${crit.desc}`, styles: { cellPadding: { left: 5, top: 1, bottom: 1, right: 1.5 } } },
-          { content: p1?.criteriaScores?.[crit.id] ?? '-', styles: { halign: 'center', valign: 'middle', fontStyle: 'bold', cellPadding: 1.5 } },
-          { content: p2?.criteriaScores?.[crit.id] ?? '-', styles: { halign: 'center', valign: 'middle', fontStyle: 'bold', cellPadding: 1.5 } }
+          { content: s1?.criteriaScores?.[crit.id] ?? '-', styles: { halign: 'center', valign: 'middle', fontStyle: 'bold', cellPadding: 1.5 } },
+          { content: s2?.criteriaScores?.[crit.id] ?? '-', styles: { halign: 'center', valign: 'middle', fontStyle: 'bold', cellPadding: 1.5 } }
         ]);
       });
     });
 
-    // Add totals row
     tableData.push([
       { content: 'Total Nilai (Sebelum Penalti)', styles: { fontStyle: 'bold', halign: 'right', fillColor: [250, 250, 250], cellPadding: 2 } },
-      { content: p1 ? (Number.isInteger(raw1) ? raw1 : Number(raw1).toFixed(2)) : '-', styles: { fontStyle: 'bold', halign: 'center', fillColor: [250, 250, 250], cellPadding: 2 } },
-      { content: p2 ? (Number.isInteger(raw2) ? raw2 : Number(raw2).toFixed(2)) : '-', styles: { fontStyle: 'bold', halign: 'center', fillColor: [250, 250, 250], cellPadding: 2 } }
+      { content: s1 ? (Number.isInteger(raw1) ? raw1 : Number(raw1).toFixed(2)) : '-', styles: { fontStyle: 'bold', halign: 'center', fillColor: [250, 250, 250], cellPadding: 2 } },
+      { content: s2 ? (Number.isInteger(raw2) ? raw2 : Number(raw2).toFixed(2)) : '-', styles: { fontStyle: 'bold', halign: 'center', fillColor: [250, 250, 250], cellPadding: 2 } }
     ]);
     
     tableData.push([
@@ -485,70 +473,21 @@ export function AdminDashboard() {
       { content: Number.isInteger(grandTotal) ? grandTotal : Number(grandTotal).toFixed(2), styles: { fontStyle: 'bold', halign: 'center', fillColor: [220, 240, 220], cellPadding: 3, fontSize: 11 } }
     ]);
 
-    const getCategoryColor = (category: string): [number, number, number] => {
-      const cat = category.toLowerCase();
-      if (cat.includes('sd')) return [255, 230, 230];
-      if (cat.includes('smp')) return [230, 240, 255];
-      if (cat.includes('sma') || cat.includes('smk')) return [230, 245, 230];
-      if (cat.includes('umum')) return [255, 245, 225];
-      if (cat.includes('instansi')) return [240, 230, 250];
-      return [250, 224, 212];
-    };
-    const catColor = getCategoryColor(participant.category || '');
-
     autoTable(doc, {
       startY: currentY,
-      head: [['Aspek/Sub Aspek/Kriteria', 'Nilai Juri 1', 'Nilai Juri 2']],
+      head: [['Kriteria Penilaian', 'Juri 1', 'Juri 2']],
       body: tableData,
       theme: 'grid',
-      headStyles: { fillColor: catColor, textColor: [0, 0, 0], fontStyle: 'bold', halign: 'center', cellPadding: 2 },
-      styles: { textColor: [0, 0, 0], fontSize: 9.5, lineColor: [0, 0, 0], lineWidth: 0.1, cellPadding: 1, minCellHeight: 6, overflow: 'linebreak' },
+      headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
       columnStyles: {
-        0: { cellWidth: 140 },
-        1: { cellWidth: 20, halign: 'center', valign: 'middle' },
-        2: { cellWidth: 20, halign: 'center', valign: 'middle' }
+        0: { cellWidth: 130 },
+        1: { cellWidth: 26 },
+        2: { cellWidth: 26 }
       },
+      styles: { fontSize: 8.5, cellPadding: 1.5, lineColor: [200, 200, 200] },
       margin: { left: 14, right: 14 },
     });
 
-    // DRAW FOOTNOTE
-    let finalY = (doc as any).lastAutoTable?.finalY || currentY;
-    doc.setFontSize(8);
-    doc.setTextColor(100, 100, 100);
-    doc.text("*Catatan: Nilai Penalti Waktu diambil dari pencatatan timer juri yang terkecil/tercepat (Benefit of the Doubt).", 14, finalY + 5);
-    doc.setTextColor(0, 0, 0);
-
-    // DRAW FOOTER ON ALL PAGES FOR THIS PARTICIPANT
-    const endPage = (doc as any).internal.getNumberOfPages();
-    for (let i = startPage; i <= endPage; i++) {
-      doc.setPage(i);
-      const pageHeight = doc.internal.pageSize.height;
-      const y = pageHeight - 15;
-      
-      // Separator line
-      doc.setDrawColor(200, 200, 200);
-      doc.setLineWidth(0.5);
-      doc.line(14, y - 4, 196, y - 4);
-      
-      doc.setFontSize(9);
-      doc.setFont("helvetica", "bold");
-      doc.setTextColor(120, 120, 120);
-      
-      // Left text
-      const nowF = new Date();
-      const padF = (n: number) => String(n).padStart(2, '0');
-      const timeStrF = `${nowF.getFullYear()}${padF(nowF.getMonth() + 1)}${padF(nowF.getDate())} ${padF(nowF.getHours())}.${padF(nowF.getMinutes())}.${padF(nowF.getSeconds())}`;
-      doc.text(timeStrF, 14, y);
-      
-      // Center text
-      doc.text(`Hal. ${i - startPage + 1} dari ${endPage - startPage + 1}`, 105, y, { align: 'center' });
-      
-      // Right text
-      doc.text(`${participant.number} ${participant.name}`, 196, y, { align: 'right' });
-    }
-    
-    doc.setTextColor(0, 0, 0); // reset color
-    
     if (autoDownload) {
       const now = new Date();
       const pad = (n: number) => String(n).padStart(2, '0');
@@ -558,7 +497,6 @@ export function AdminDashboard() {
       doc.save(filename);
     }
   };
-;;
 
   const exportSemuaNilaiRinci = () => {
     try {
@@ -592,9 +530,9 @@ export function AdminDashboard() {
     if (!participantToReset) return;
     try {
       const pScores = scores.filter(s => s.participantId === participantToReset.id);
-      const scoresToDelete = posToReset === 'all' 
-        ? pScores 
-        : pScores.filter((score: any) => score.post === posToReset);
+      const scoresToDelete = judgeToReset === 'all' 
+    ? pScores 
+    : pScores.filter((score: any) => (score.judgeName || score.judgeId) === judgeToReset);
 
       if (scoresToDelete.length === 0) {
         showToast('Tidak ada nilai untuk juri tersebut', 'error');
@@ -605,7 +543,7 @@ export function AdminDashboard() {
         await updateDoc(doc(db, 'scores', score.id), { deletedAt: new Date().toISOString() });
       }
       setParticipantToReset(null);
-      setPosToReset('all');
+      setJudgeToReset('all');
       showToast('Berhasil mereset nilai peserta', 'success');
     } catch(err) {
       console.error(err);
@@ -843,9 +781,7 @@ export function AdminDashboard() {
     setNewUserEmail(u.email);
     setNewUserPass('');
     setNewUserRole(u.role as 'admin' | 'admin_leaderboard' | 'judge');
-    setNewUserPost(u.post || 1);
-    setNewUserPosts(u.posts || (u.post ? [u.post] : [1]));
-    setNewUserCategories((u.assignedCategories && u.assignedCategories.length > 0) ? u.assignedCategories : (u.role === 'judge' ? CATEGORIES : []));
+            setNewUserCategories((u.assignedCategories && u.assignedCategories.length > 0) ? u.assignedCategories : (u.role === 'judge' ? CATEGORIES : []));
     setIsUserModalOpen(true);
   };
 
@@ -927,7 +863,7 @@ export function AdminDashboard() {
         let valB = '';
         if (userSortConfig.key === 'username') { valA = a.email; valB = b.email; }
         else if (userSortConfig.key === 'role') { valA = a.role; valB = b.role; }
-        else if (userSortConfig.key === 'post') { valA = a.post?.toString() || ''; valB = b.post?.toString() || ''; }
+        
         else if (userSortConfig.key === 'categories') { valA = a.assignedCategories?.join(',') || ''; valB = b.assignedCategories?.join(',') || ''; }
         
         if (valA < valB) return userSortConfig.direction === 'asc' ? -1 : 1;
@@ -951,11 +887,11 @@ export function AdminDashboard() {
 
   const handleDownloadUserTemplate = () => {
     const ws = utils.aoa_to_sheet([
-      ['Nama Pengguna', 'Password', 'Peran', 'Tugas Juri', 'Kategori'],
-      ['juri_sd1', 'rahasia123', 'juri', '1', 'SD Putra, SD Putri'],
-      ['juri_smp2', 'rahasia123', 'juri', '2', 'SMP Putra, SMP Putri'],
-      ['admin_pusat', 'admin123', 'admin', '', ''],
-      ['admin_nilai', 'admin123', 'admin_leaderboard', '', '']
+      ['Nama Pengguna', 'Password', 'Peran', 'Kategori'],
+      ['juri_sd1', 'rahasia123', 'juri', 'SD Putra, SD Putri'],
+      ['juri_smp2', 'rahasia123', 'juri', 'SMP Putra, SMP Putri'],
+      ['admin_pusat', 'admin123', 'admin', ''],
+      ['admin_nilai', 'admin123', 'admin_leaderboard', '']
     ]);
     const wb = utils.book_new();
     utils.book_append_sheet(wb, ws, "Template Juri");
@@ -994,10 +930,7 @@ export function AdminDashboard() {
           const role = peranText.includes('leaderboard') ? 'admin_leaderboard' : peranText.includes('admin') ? 'admin' : 'judge';
           
           const posRaw = String(row[3] || '');
-          let posts = posRaw ? posRaw.split(',').map(p => Number(p.trim())).filter(p => [1,2,3].includes(p)) : [];
-          if (posts.length === 0 && role === 'judge') {
-            posts = [1];
-          }
+          
 
           const catRaw = String(row[4] || '');
           const cats = catRaw ? catRaw.split(',').map(c => {
@@ -1014,9 +947,7 @@ export function AdminDashboard() {
             email: username,
             password: password,
             role: role,
-            post: role === 'judge' ? posts[0] : null,
-            posts: role === 'judge' ? posts : null,
-            assignedCategories: role === 'judge' ? cats : null,
+                                    assignedCategories: role === 'judge' ? cats : null,
             createdAt: new Date().toISOString()
           };
 
@@ -1055,9 +986,7 @@ export function AdminDashboard() {
       const payload: any = {
         email: processedEmail,
         role: newUserRole,
-        post: newUserRole === 'judge' ? (newUserPosts[0] || newUserPost) : null,
-        posts: newUserRole === 'judge' ? newUserPosts : null,
-        assignedCategories: newUserRole === 'judge' ? newUserCategories : null
+                        assignedCategories: newUserRole === 'judge' ? newUserCategories : null
       };
       
       if (newUserPass) {
@@ -1141,37 +1070,34 @@ export function AdminDashboard() {
       let grandTotal = 0;
       let excess = 0;
       if (pScores.length > 0) {
-        const s1 = pScores.find(s => Number(s.post) === 1);
-        const s2 = pScores.find(s => Number(s.post) === 2);
-        
+        const validScores = pScores.filter((s:any) => !s.isDisqualified);
+        const s1 = validScores[0];
+        const s2 = validScores[1];
+
         juri1Total = s1?.totalScore || 0;
         if (s2) {
           juri2Total = s2?.totalScore || 0;
         }
-        
-        // Sum up the penalties (or take average?)
-        // If Juri 1 and Juri 2 both recorded penalties, the penalty should probably just be the average or max.
-        // Let's take the max penalty recorded.
+
         const raw1 = s1?.totalScore || 0;
-        const raw2 = s2 ? (s2?.totalScore || 0) : raw1;
-        
-        // Ambil waktu terkecil yang lebih dari 0 untuk penalti (kecuali dua-duanya 0)
-        const t1 = s1?.timerSeconds || 0;
-        const t2 = s2?.timerSeconds || 0;
+        const raw2 = s2?.totalScore || 0;
+
         let validTimer = 0;
-        
-        if (t1 > 0 && t2 > 0) {
-          validTimer = Math.min(t1, t2);
-        } else if (t1 > 0) {
-          validTimer = t1;
-        } else if (t2 > 0) {
-          validTimer = t2;
-        }
+        const timers = validScores.map((s:any) => s.timerSeconds || 0).filter((t:number) => t > 0);
+        if (timers.length > 0) validTimer = Math.min(...timers);
         
         excess = Math.max(0, validTimer - 300);
         totalPenalty = excess * (5 / 60);
+
+        let avgRaw = 0;
+        if (s1 && s2) {
+           avgRaw = raw1 + raw2; 
+        } else if (s1) {
+           avgRaw = raw1;
+        } else if (s2) {
+           avgRaw = raw2;
+        }
         
-        const avgRaw = (raw1 + raw2) / 2;
         grandTotal = avgRaw - totalPenalty;
       }
       
@@ -1325,7 +1251,7 @@ export function AdminDashboard() {
               >
                 <option value="">-- Pilih Juri --</option>
                 {appUsers.filter(u => u.role === 'judge').map(j => (
-                  <option key={j.id} value={j.id}>Juri {j.posts ? j.posts.join(', ') : (j.post || '?')} - {j.id.charAt(0).toUpperCase() + j.id.slice(1)} {j.assignedCategories ? `(${j.assignedCategories.join(', ')})` : ''}</option>
+                  <option key={j.id} value={j.id}>Juri: {j.id.charAt(0).toUpperCase() + j.id.slice(1)} {j.assignedCategories ? `(${j.assignedCategories.join(', ')})` : ''}</option>
                 ))}
               </select>
             </div>
@@ -1342,9 +1268,7 @@ export function AdminDashboard() {
                       loginCustom({
                         uid: targetJudge.id,
                         appRole: 'judge',
-                        post: targetJudge.post,
-                        posts: targetJudge.posts,
-                        assignedCategories: targetJudge.assignedCategories || [],
+                                                assignedCategories: targetJudge.assignedCategories || [],
                         originalRole: 'super_admin',
                         originalUid: user.uid
                       }, false);
@@ -2095,8 +2019,7 @@ export function AdminDashboard() {
                         <th className="px-1 sm:px-3 py-2 font-medium">No.</th>
                         <th className="px-4 py-3 font-medium cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => requestUserSort('username')}>Nama Pengguna</th>
                         <th className="px-4 py-3 font-medium cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => requestUserSort('role')}>Peran</th>
-                        <th className="px-4 py-3 font-medium cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => requestUserSort('post')}>Juri</th>
-                        <th className="px-4 py-3 font-medium rounded-tr-md cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => requestUserSort('categories')}>Kategori Akses</th>
+                                                <th className="px-4 py-3 font-medium rounded-tr-md cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => requestUserSort('categories')}>Kategori Akses</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -2170,10 +2093,7 @@ export function AdminDashboard() {
                               </div>
                             )}
                           </td>
-                          <td className="px-4 py-3">
-                            {u.role === 'judge' ? (u.posts && u.posts.length > 0 ? `Juri ${u.posts.join(', ')}` : `Juri ${u.post}`) : '-'}
-                          </td>
-                          <td className="px-4 py-3">
+                                                    <td className="px-4 py-3">
                             {u.role === 'judge' && u.assignedCategories ? (
                               <div className="flex flex-wrap gap-1 justify-center">
                                 {u.assignedCategories.map(c => (
@@ -2296,7 +2216,7 @@ export function AdminDashboard() {
                     <h3 className="text-3xl font-bold text-green-600">
                       {participants.filter(p => {
                         const pScores = scores.filter(s => s.participantId === p.id);
-                        return new Set(pScores.map(s => s.post)).size === 2;
+                        return pScores.length >= appUsers.filter(u => u.role === "judge").length && pScores.length > 0;
                       }).length}
                     </h3>
                   </div>
@@ -2405,7 +2325,7 @@ export function AdminDashboard() {
                         let selesai = 0; let proses = 0; let belum = 0;
                         catParticipants.forEach(p => {
                           const pScores = scores.filter(s => s.participantId === p.id);
-                          const validPosCount = new Set(pScores.map(s => s.post)).size;
+                          const validPosCount = pScores.length;
                           if (validPosCount === 2) selesai++;
                           else if (validPosCount > 0) proses++;
                           else belum++;
@@ -2663,7 +2583,7 @@ export function AdminDashboard() {
                         <div key={s.id} className="flex items-center justify-between p-3 border rounded-md bg-slate-50">
                           <div>
                             <p className="font-medium text-slate-900">{participant?.name || 'Peserta tidak ditemukan'}</p>
-                            <p className="text-xs text-slate-500">Juri {s.post} • Juri: {s.judgeName}</p>
+                            <p className="text-xs text-slate-500">Juri: {s.judgeName}</p>
                             {s.deletedAt && <p className="text-[10px] text-slate-400 mt-1">Dihapus pada {new Date(s.deletedAt).toLocaleString('id-ID', { dateStyle: 'medium', timeStyle: 'short' })}</p>}
                           </div>
                           <div className="flex space-x-2">
@@ -2832,28 +2752,7 @@ export function AdminDashboard() {
                     {newUserRole === 'judge' && (
                       <>
                         <div className="pt-2 border-t">
-                          <label className="text-sm font-medium text-slate-700 mb-2 block">Tugas Juri</label>
-                          <div className="space-y-2 max-h-[150px] overflow-y-auto p-2 border rounded-md bg-slate-50 mb-4">
-                            {[1, 2].map(pos => (
-                              <label key={pos} className="flex items-center space-x-2">
-                                <input 
-                                  type="checkbox" 
-                                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
-                                  checked={newUserPosts.includes(pos)}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setNewUserPosts([...newUserPosts, pos]);
-                                    } else {
-                                      setNewUserPosts(newUserPosts.filter(p => p !== pos));
-                                    }
-                                  }}
-                                />
-                                <span className="text-sm text-slate-700">Juri {pos}</span>
-                              </label>
-                            ))}
-                          </div>
-                          
-                          <label className="text-sm font-medium text-slate-700 mb-2 block">Kategori Peserta yang Dinilai</label>
+<label className="text-sm font-medium text-slate-700 mb-2 block">Kategori Peserta yang Dinilai</label>
                           <div className="space-y-2 max-h-[150px] overflow-y-auto p-2 border rounded-md bg-slate-50">
                             {CATEGORIES.map(cat => (
                               <label key={cat} className="flex items-center space-x-2">
@@ -3099,14 +2998,13 @@ export function AdminDashboard() {
             
             <div className="p-3 sm:p-4 overflow-y-auto flex-1 bg-slate-50 rounded-b-xl">
               <div className="space-y-3 sm:space-y-4">
-                {[1, 2].map(post => {
-                  const pScore = scores.find(s => s.participantId === participantForDetail.id && s.post === post);
+                {scores.filter((s:any) => s.participantId === participantForDetail.id && !s.deletedAt).map((pScore: any) => {
                   if (!pScore) return null;
                   
                   return (
-                    <div key={post} className="bg-white border rounded-lg overflow-hidden shadow-sm">
+                    <div key={pScore.id} className="bg-white border rounded-lg overflow-hidden shadow-sm">
                       <div className="bg-slate-100 px-3 py-2 border-b flex justify-between items-center sticky top-0 z-10">
-                        <span className="font-semibold text-slate-800 text-xs sm:text-sm">Juri {post}</span>
+                        <span className="font-semibold text-slate-800 text-xs sm:text-sm">Juri: {pScore.judgeName || pScore.judgeId}</span>
                         {pScore.isDisqualified ? (
                           <Badge variant="destructive" className="px-2 py-0 text-[10px] sm:text-xs">Diskualifikasi</Badge>
                         ) : (
@@ -3116,7 +3014,7 @@ export function AdminDashboard() {
                       {!pScore.isDisqualified && (
                         <table className="w-full text-xs sm:text-sm">
                           <tbody>
-                            {(SCORING_CRITERIA[post as 1|2|3] || []).map(crit => (
+                            {(FLAT_CRITERIA || []).map(crit => (
                               <tr key={crit.id} className="border-b last:border-0 hover:bg-slate-50/50 transition-colors">
                                 <td className="px-3 py-2 text-slate-600 align-top">
                                   <div className="font-semibold text-slate-800 leading-tight">{crit.name}</div>
@@ -3148,19 +3046,20 @@ export function AdminDashboard() {
               Apakah Anda yakin ingin menghapus nilai untuk peserta <strong>No. {participantToReset.number}</strong>? Tindakan ini tidak dapat dibatalkan.
             </p>
             <div className="mb-6">
-              <label className="text-sm font-medium text-slate-700 block mb-1">Pilih Juri yang Direset:</label>
-              <select
-                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
-                value={posToReset}
-                onChange={(e) => setPosToReset(e.target.value === 'all' ? 'all' : Number(e.target.value) as 1 | 2 | 3)}
-              >
-                <option value="all">Semua Juri</option>
-                <option value={1}>Juri 1</option>
-                <option value={2}>Juri 2</option>
-              </select>
-            </div>
+    <label className="text-sm font-medium text-slate-700 block mb-1">Pilih Juri yang Direset:</label>
+    <select
+      className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600"
+      value={judgeToReset}
+      onChange={(e) => setJudgeToReset(e.target.value)}
+    >
+      <option value="all">Semua Juri</option>
+      {Array.from(new Set(scores.filter((s:any) => s.participantId === participantToReset?.id).map((s:any) => s.judgeName || s.judgeId))).map(jName => (
+        <option key={jName as string} value={jName as string}>{jName as string}</option>
+      ))}
+    </select>
+  </div>
             <div className="flex justify-end space-x-3">
-              <Button variant="outline" onClick={() => { setParticipantToReset(null); setPosToReset('all'); }}>Batal</Button>
+              <Button variant="outline" onClick={() => { setParticipantToReset(null); setJudgeToReset('all'); }}>Batal</Button>
               <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={handleResetParticipantScore}>Reset Nilai</Button>
             </div>
           </div>

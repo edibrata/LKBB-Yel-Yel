@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { db } from '../lib/firebase';
 import { doc, getDoc, collection, query, where, getDocs, setDoc } from 'firebase/firestore';
 import { Button } from '../components/ui/button';
-import { SCORING_CRITERIA } from '../lib/constants';
+import { SCORING_CRITERIA, FLAT_CRITERIA } from '../lib/constants';
 import { ArrowLeft, Save, AlertCircle, ChevronDown, ChevronUp, Check, Play } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { BiasGuidelineModal } from '../components/BiasGuidelineModal';
@@ -12,8 +12,6 @@ import { BiasGuidelineModal } from '../components/BiasGuidelineModal';
 export function JudgeScoring() {
   const { user } = useAuth();
   const { participantId } = useParams();
-  const [searchParams] = useSearchParams();
-  const post = parseInt(searchParams.get('post') || '1');
   const navigate = useNavigate();
 
   const [participant, setParticipant] = useState<any>(null);
@@ -76,7 +74,7 @@ export function JudgeScoring() {
   
   const criteriaRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
-  const criteriaList = SCORING_CRITERIA[post as keyof typeof SCORING_CRITERIA] || [];
+  const criteriaList = FLAT_CRITERIA || [];
 
   // Warn before unload if dirty
   useEffect(() => {
@@ -122,7 +120,7 @@ export function JudgeScoring() {
         collection(db, 'scores'), 
         where('participantId', '==', participantId),
         where('judgeId', '==', user.uid),
-        where('post', '==', post)
+        /* removed post query */
       );
       const scoreSnaps = await getDocs(q);
 
@@ -132,8 +130,8 @@ export function JudgeScoring() {
         setHasExistingScore(true);
       }
 
-      const draftKey = `draft_score_${user.uid}_${participantId}_${post}`;
-      // Clean up dbScores based on valid criteria for this post
+      const draftKey = `draft_score_${user.uid}_${participantId}`;
+      // Clean up dbScores based on valid criteria
       const validCriteriaIds = criteriaList.map(c => c.id);
       const cleanedDbScores = {};
       for (const key in dbScores) {
@@ -169,13 +167,13 @@ export function JudgeScoring() {
       setIsLoaded(true);
     }
     loadData();
-  }, [participantId, user, post]);
+  }, [participantId, user]);
 
   const handleScoreChange = (criteriaId: string, value: number) => {
     setScores(prev => {
       const newScores = { ...prev, [criteriaId]: value };
       if (user && participantId) {
-        const draftKey = `draft_score_${user.uid}_${participantId}_${post}`;
+        const draftKey = `draft_score_${user.uid}_${participantId}`;
         localStorage.setItem(draftKey, JSON.stringify(newScores));
       }
       return newScores;
@@ -203,7 +201,7 @@ export function JudgeScoring() {
 
     setIsSaving(true);
     try {
-      const docId = `${participantId}_${user.uid}_${post}`;
+      const docId = `${participantId}_${user.uid}`;
       // Recalculate based on valid keys only
       const validCriteriaIds = criteriaList.map(c => c.id);
       const cleanedScores = {};
@@ -243,13 +241,12 @@ export function JudgeScoring() {
         participantId,
         judgeId: user.uid,
         judgeName: user.uid.charAt(0).toUpperCase() + user.uid.slice(1),
-        post,
         criteriaScores: cleanedScores,
         totalScore, timePenalty, finalScore, timerSeconds,
         timestamp: new Date().toISOString()
       });
 
-      const draftKey = `draft_score_${user.uid}_${participantId}_${post}`;
+      const draftKey = `draft_score_${user.uid}_${participantId}`;
       localStorage.removeItem(draftKey);
       setIsDirty(false);
 
@@ -329,7 +326,7 @@ export function JudgeScoring() {
                   {participant?.category}
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400 mt-0.5">Juri {post}</p>
+              <p className="text-[10px] text-slate-400 mt-0.5">Juri {user?.uid.charAt(0).toUpperCase() + user?.uid.slice(1)}</p>
             </div>
           </div>
           
@@ -529,7 +526,7 @@ export function JudgeScoring() {
               <Button variant="outline" onClick={() => setIsConfirmingExit(false)}>Batal</Button>
               <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={() => {
                 if (user && participantId) {
-                  const draftKey = `draft_score_${user.uid}_${participantId}_${post}`;
+                  const draftKey = `draft_score_${user.uid}_${participantId}`;
                   localStorage.removeItem(draftKey);
                 }
                 navigate('/judge');
