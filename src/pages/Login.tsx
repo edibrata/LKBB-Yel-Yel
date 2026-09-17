@@ -128,7 +128,7 @@ export function Login() {
           <div className="mx-auto w-20 h-20 flex items-center justify-center mb-2">
             <img 
               src="https://raw.githubusercontent.com/edibrata/image/main/Logo%20Gerak%20Jalan.png" 
-              alt="Logo Gerak Jalan" 
+              alt="Logo LKBB dan Yel-Yel" 
               className="w-full h-full object-contain"
               referrerPolicy="no-referrer"
             />
