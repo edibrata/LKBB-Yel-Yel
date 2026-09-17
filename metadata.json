@@ -1,0 +1,8 @@
+{
+  "name": "LKBB dan Yel-Yel Menjelajah Pramuka",
+  "description": "Aplikasi penilaian LKBB dan Yel-Yel Menjelajah Pramuka Penggalang Sukaresmi 2026",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

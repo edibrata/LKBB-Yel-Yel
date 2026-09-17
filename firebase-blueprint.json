@@ -1,0 +1,32 @@
+{
+  "collections": [
+    {
+      "name": "participants",
+      "fields": [
+        { "name": "number", "type": "string" },
+        { "name": "name", "type": "string" },
+        { "name": "category", "type": "string" }
+      ]
+    },
+    {
+      "name": "users",
+      "fields": [
+        { "name": "role", "type": "string" },
+        { "name": "post", "type": "number" },
+        { "name": "name", "type": "string" },
+        { "name": "email", "type": "string" }
+      ]
+    },
+    {
+      "name": "scores",
+      "fields": [
+        { "name": "participantId", "type": "string" },
+        { "name": "judgeId", "type": "string" },
+        { "name": "post", "type": "number" },
+        { "name": "criteriaScores", "type": "map" },
+        { "name": "totalScore", "type": "number" },
+        { "name": "timestamp", "type": "timestamp" }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+    
+    doc.text("Kategori", 14, 23); doc.text(`: ${participant.category}`, 45, 23);
+    doc.text("Nomor Peserta", 14, 28); doc.text(`: ${participant.number}`, 45, 28);
+    doc.text("Nama Regu", 14, 33); doc.text(`: ${participant.name}`, 45, 33);
+    doc.text("Jumlah Nilai", 14, 38); doc.text(`: ${totalAll}`, 45, 38);
+
+    let currentY = 44;
+
+    const posTitles: Record<number, string> = {
+      1: "Pos 1 (LKBB dan Yel-Yel)",
+      2: "Pos 2 (Barisan dan Pakaian)",
+      3: "Pos 3 (Barisan dan Variasi/Yel-Yel)"
+    };
+    
+    const posGroups: Record<number, { title: string, prefix: string }[]> = {
+      1: [
+        { title: "A. Keterampilan Baris Berbaris", prefix: "lkbb_" },
+        { title: "B. Barisan", prefix: "barisan_" }
+      ],
+      2: [
+        { title: "A. Barisan", prefix: "barisan_" },
+        { title: "B. Pakaian", prefix: "pakaian_" }
+      ],
+      3: [
+        { title: "A. Barisan", prefix: "barisan_" },
+        { title: "B. Variasi dan Yel-Yel", prefix: "variasi_" }
+      ]
+    };
+
+    [1, 2, 3].forEach(post => {
+      const pScore = detailScores.find(s => s.post === post);
+      if (!pScore) return;
+      
+      currentY = checkPageBreak(currentY, 15);
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10.5);
+      doc.text(posTitles[post], 14, currentY);
+      currentY += 3;
+
+      if (pScore.isDisqualified) {
+        doc.text(`Pos ${post}: DISKUALIFIKASI`, 14, currentY + 5);
+        currentY += 12;
+        return;
+      }
+      
+      const criteriaDef = SCORING_CRITERIA[post as 1|2|3];
+      if (!criteriaDef) return;
+      
+      const tableData: any[] = [];
+      const groups = posGroups[post];
+
+      groups.forEach(group => {
+        tableData.push([
+          { content: group.title, colSpan: 2, styles: { fontStyle: 'bold', fillColor: [255, 255, 255], cellPadding: 1.5 } }
+        ]);
+
+        const groupCriteria = criteriaDef.filter(c => c.id.startsWith(group.prefix));
+        groupCriteria.forEach((crit, index) => {
+          tableData.push([
+            { content: `${index + 1}. ${crit.name}\n    ${crit.desc}`, styles: { cellPadding: { left: 5, top: 1, bottom: 1, right: 1.5 } } },
+            { content: pScore.criteriaScores?.[crit.id] || 0, styles: { halign: 'center', valign: 'middle', fontStyle: 'bold', cellPadding: 1.5 } }
+          ]);
+        });
+      });
+
+      const postTotal = pScore.totalScore;
+
+      const getCategoryColor = (category: string): [number, number, number] => {
+        const cat = category.toLowerCase();
+        if (cat.includes('sd')) return [255, 230, 230];
