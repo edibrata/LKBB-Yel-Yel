@@ -6,9 +6,10 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { Input } from '../components/ui/input';
 import { CATEGORIES, SCORING_CRITERIA, FLAT_CRITERIA } from '../lib/constants';
-import { Maximize, Minimize, LogOut, Download, Plus, Search, Check, AlertCircle, Upload, Users, UserCog, ClipboardList, Eye, EyeOff, Edit2, Trash2, FileText, Printer, FileDown, Trophy, Info, RotateCcw, X, BarChart3 } from 'lucide-react';
+import { Maximize, Minimize, LogOut, Download, Plus, Search, Check, AlertCircle, Upload, Users, UserCog, ClipboardList, Eye, EyeOff, Edit2, Trash2, FileText, Printer, FileDown, Trophy, Info, RotateCcw, X, BarChart3, ShieldCheck } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import AuditEvaluasi from "../components/AuditEvaluasi";
+import StatistikLomba from "../components/StatistikLomba";
 import { utils, writeFile, read } from 'xlsx';
 import ExcelJS from 'exceljs';
 import jsPDF from 'jspdf';
@@ -47,6 +48,7 @@ export function AdminDashboard() {
   const isSuperAdmin = user?.appRole === 'super_admin';
   const canManageParticipants = isSuperAdmin || user?.appRole === 'admin';
   const [activeMainTab, setActiveMainTab] = useState<'peserta' | 'rekap' | 'leaderboard' | 'users' | 'ekspor' | 'statistik' | 'trash'>(user?.appRole === 'admin_leaderboard' ? 'leaderboard' : 'peserta');
+  const [statSubTab, setStatSubTab] = useState<'lomba' | 'audit' | 'semua'>('lomba');
   const [trashParticipants, setTrashParticipants] = useState<Participant[]>([]);
   const [trashScores, setTrashScores] = useState<ScoreRecord[]>([]);
   const [trashSearch, setTrashSearch] = useState('');
@@ -2853,7 +2855,92 @@ export function AdminDashboard() {
       )}
 
       {activeMainTab === 'statistik' && (
-        <AuditEvaluasi participants={participants} scores={scores} appUsers={appUsers} />
+        <div className="space-y-6 animate-in fade-in duration-200">
+          {/* Sub-tab Navigation Bar */}
+          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <button
+                type="button"
+                onClick={() => setStatSubTab('lomba')}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+                  statSubTab === 'lomba'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+              >
+                <BarChart3 className="w-4 h-4" />
+                Statistik & Progres Lomba
+              </button>
+              <button
+                type="button"
+                onClick={() => setStatSubTab('audit')}
+                className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+                  statSubTab === 'audit'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                }`}
+              >
+                <ShieldCheck className="w-4 h-4" />
+                Audit & Evaluasi Penilaian
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setStatSubTab(statSubTab === 'semua' ? 'lomba' : 'semua')}
+              className={`text-xs px-3 py-1.5 rounded-md border transition-colors self-end sm:self-auto ${
+                statSubTab === 'semua'
+                  ? 'border-blue-500 bg-blue-50 text-blue-700 font-semibold'
+                  : 'border-slate-200 text-slate-500 hover:bg-slate-50'
+              }`}
+            >
+              {statSubTab === 'semua' ? '✓ Menampilkan Semua' : 'Tampilkan Keduanya'}
+            </button>
+          </div>
+
+          {/* Konten Tab 1: Statistik & Progres Lomba */}
+          {(statSubTab === 'lomba' || statSubTab === 'semua') && (
+            <div className="space-y-4">
+              {statSubTab === 'semua' && (
+                <div className="border-b border-slate-200 pb-2">
+                  <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <BarChart3 className="w-5 h-5 text-blue-600" />
+                    Statistik & Progres Kompetisi
+                  </h3>
+                </div>
+              )}
+              <StatistikLomba participants={participants} scores={scores} appUsers={appUsers} />
+            </div>
+          )}
+
+          {statSubTab === 'semua' && (
+            <div className="relative py-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t-2 border-dashed border-slate-200" />
+              </div>
+              <div className="relative flex justify-center">
+                <span className="bg-slate-50 px-3 text-xs uppercase font-semibold text-slate-400">
+                  Modul Audit & Evaluasi Penilaian
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* Konten Tab 2: Audit & Evaluasi Penilaian */}
+          {(statSubTab === 'audit' || statSubTab === 'semua') && (
+            <div className="space-y-4">
+              {statSubTab === 'semua' && (
+                <div className="border-b border-slate-200 pb-2">
+                  <h3 className="text-lg font-bold text-slate-800 flex items-center gap-2">
+                    <ShieldCheck className="w-5 h-5 text-indigo-600" />
+                    Audit & Evaluasi Kinerja Penilaian
+                  </h3>
+                </div>
+              )}
+              <AuditEvaluasi participants={participants} scores={scores} appUsers={appUsers} />
+            </div>
+          )}
+        </div>
       )}
       {activeMainTab === 'ekspor' && (
         <div className="space-y-6">

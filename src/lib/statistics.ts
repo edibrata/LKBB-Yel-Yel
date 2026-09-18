@@ -50,3 +50,84 @@ export function calculateSpearmanRankCorrelation(x: number[], y: number[]): numb
   const rankY = getRankings(y);
   return calculatePearsonCorrelation(rankX, rankY);
 }
+
+// 1. Inter-Rater Reliability / Agreement (ICC & Pearson Agreement)
+export function calculateInterRaterAgreement(j1Scores: number[], j2Scores: number[]): {
+  coefficient: number;
+  judgement: string;
+  badgeColor: string;
+} {
+  if (j1Scores.length < 2 || j2Scores.length < 2 || j1Scores.length !== j2Scores.length) {
+    return {
+      coefficient: 0,
+      judgement: "Data Belum Cukup (Minimal 2 Regu Dinilai Bersama)",
+      badgeColor: "text-slate-500"
+    };
+  }
+
+  const r = calculatePearsonCorrelation(j1Scores, j2Scores);
+  const clampedR = Math.max(-1, Math.min(1, r));
+
+  let judgement = "Rendah (Penyamaan Persepsi Diperlukan)";
+  let badgeColor = "text-red-600";
+  if (clampedR >= 0.85) {
+    judgement = "Sangat Tinggi (Konsensus Juri Sangat Kuat)";
+    badgeColor = "text-emerald-600";
+  } else if (clampedR >= 0.70) {
+    judgement = "Tinggi (Objektif & Selaras)";
+    badgeColor = "text-emerald-500";
+  } else if (clampedR >= 0.50) {
+    judgement = "Cukup / Moderat";
+    badgeColor = "text-blue-500";
+  } else if (clampedR >= 0.30) {
+    judgement = "Kurang Selaras";
+    badgeColor = "text-amber-500";
+  }
+
+  return {
+    coefficient: Number(clampedR.toFixed(3)),
+    judgement,
+    badgeColor
+  };
+}
+
+// 2. Uji Efek Kelelahan & Urutan Tampil (Fatigue & Order Effect Audit)
+export function calculateOrderEffectStability(orders: number[], totalScores: number[]): {
+  r: number;
+  judgement: string;
+  isStable: boolean;
+} {
+  if (orders.length < 3 || totalScores.length < 3 || orders.length !== totalScores.length) {
+    return {
+      r: 0,
+      judgement: "Data Belum Cukup",
+      isStable: true
+    };
+  }
+
+  const r = calculatePearsonCorrelation(orders, totalScores);
+  const absR = Math.abs(r);
+
+  let judgement = "Stabil & Netral (Bebas Efek Urutan Tampil)";
+  let isStable = true;
+
+  if (absR < 0.25) {
+    judgement = "Sangat Stabil (Independen dari Nomor Undian / Jam Tampil)";
+    isStable = true;
+  } else if (absR < 0.45) {
+    judgement = "Cukup Stabil (Fluktuasi Minor yang Wajar)";
+    isStable = true;
+  } else if (r >= 0.45) {
+    judgement = "Kecenderungan Skor Meningkat pada Regu Akhir";
+    isStable = false;
+  } else {
+    judgement = "Kecenderungan Skor Menurun pada Regu Akhir (Efek Kelelahan)";
+    isStable = false;
+  }
+
+  return {
+    r: Number(r.toFixed(3)),
+    judgement,
+    isStable
+  };
+}
