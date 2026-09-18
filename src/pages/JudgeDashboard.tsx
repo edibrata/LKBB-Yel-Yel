@@ -128,7 +128,10 @@ export function JudgeDashboard() {
         <div className="max-w-4xl mx-auto p-4 flex items-center justify-between">
           <div>
             <h1 className="text-xl font-bold text-slate-900">Juri App - LKBB dan Yel-Yel</h1>
-            <p className="text-sm text-slate-500">{user?.uid && user.uid.charAt(0).toUpperCase() + user.uid.slice(1)}</p>
+            <p className="text-sm text-slate-500">
+              {user?.uid && user.uid.charAt(0).toUpperCase() + user.uid.slice(1)}
+              {user?.assignedPosts?.length ? ` (${user.assignedPosts.join(', ')})` : ''}
+            </p>
           </div>
           <div className="flex items-center space-x-4">
             {(user?.appRole === 'super_admin' || user?.appRole === 'admin' || user?.originalRole === 'super_admin' || user?.originalRole === 'admin') && (

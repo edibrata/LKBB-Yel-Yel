@@ -9,6 +9,7 @@ export interface AppUser {
 
 
   assignedCategories?: string[];
+  assignedPosts?: string[];
   originalRole?: 'super_admin' | 'admin';
   originalUid?: string;
 }
@@ -54,6 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 
                 assignedCategories: data.assignedCategories || [],
+                assignedPosts: data.assignedPosts || [],
                 originalRole: parsedUser.originalRole,
                 originalUid: parsedUser.originalUid
               });

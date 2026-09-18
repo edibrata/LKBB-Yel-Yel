@@ -125,12 +125,21 @@ export function JudgeScoring() {
       const scoreSnaps = await getDocs(q);
 
       let dbScores = {};
+      const draftKey = `draft_score_${user.uid}_${participantId}`;
+
       if (!scoreSnaps.empty) {
-        dbScores = scoreSnaps.docs[0].data().criteriaScores || {};
-        setHasExistingScore(true);
+        // Cari data nilai yang tidak memiliki flag deletedAt (belum di-reset admin)
+        const validDoc = scoreSnaps.docs.find(doc => !doc.data().deletedAt);
+        
+        if (validDoc) {
+          dbScores = validDoc.data().criteriaScores || {};
+          setHasExistingScore(true);
+        } else {
+          // Jika admin me-reset nilai, hapus juga draft yang mungkin nyangkut di localStorage
+          localStorage.removeItem(draftKey);
+        }
       }
 
-      const draftKey = `draft_score_${user.uid}_${participantId}`;
       // Clean up dbScores based on valid criteria
       const validCriteriaIds = criteriaList.map(c => c.id);
       const cleanedDbScores = {};
@@ -326,7 +335,10 @@ export function JudgeScoring() {
                   {participant?.category}
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400 mt-0.5">Juri {user?.uid.charAt(0).toUpperCase() + user?.uid.slice(1)}</p>
+              <p className="text-[10px] text-slate-400 mt-0.5">
+                {user?.uid.charAt(0).toUpperCase() + user?.uid.slice(1)}
+                {user?.assignedPosts?.length ? ` (${user.assignedPosts.join(', ')})` : ''}
+              </p>
             </div>
           </div>
           
