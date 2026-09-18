@@ -1082,19 +1082,39 @@ export function AdminDashboard() {
       let excess = 0;
       if (pScores.length > 0) {
         const validScores = pScores.filter((s:any) => !s.isDisqualified);
-        const s1 = validScores[0];
-        const s2 = validScores[1];
+        
+        let s1: any = null;
+        let s2: any = null;
+
+        validScores.forEach((s: any) => {
+          const judgeUser = appUsers.find(u => u.id === s.judgeId);
+          if (judgeUser && judgeUser.role === 'judge') {
+            const hasCorrectCategory = !judgeUser.assignedCategories || judgeUser.assignedCategories.length === 0 || judgeUser.assignedCategories.includes(p.category);
+            if (hasCorrectCategory) {
+              if (judgeUser.assignedPosts?.includes('Juri 1')) {
+                if (!s1) s1 = s;
+              } else if (judgeUser.assignedPosts?.includes('Juri 2')) {
+                if (!s2) s2 = s;
+              } else {
+                if (!s1) s1 = s;
+                else if (!s2) s2 = s;
+              }
+            }
+          } else {
+            if (!s1) s1 = s;
+            else if (!s2) s2 = s;
+          }
+        });
 
         juri1Total = s1?.totalScore || 0;
-        if (s2) {
-          juri2Total = s2?.totalScore || 0;
-        }
+        juri2Total = s2?.totalScore || 0;
 
         const raw1 = s1?.totalScore || 0;
         const raw2 = s2?.totalScore || 0;
 
         let validTimer = 0;
-        const timers = validScores.map((s:any) => s.timerSeconds || 0).filter((t:number) => t > 0);
+        const usedScores = [s1, s2].filter(Boolean);
+        const timers = usedScores.map((s:any) => s.timerSeconds || 0).filter((t:number) => t > 0);
         if (timers.length > 0) validTimer = Math.min(...timers);
         
         excess = Math.max(0, validTimer - 300);
