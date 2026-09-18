@@ -62,7 +62,7 @@ export function JudgeDashboard() {
       const disqualified = new Set<string>();
       snapshot.docs.forEach(doc => {
         const data = doc.data();
-        if (data.judgeId === user.uid) {
+        if (data.judgeId === user.uid && !data.deletedAt) {
           if (data.isDisqualified) {
             disqualified.add(data.participantId);
           } else {
