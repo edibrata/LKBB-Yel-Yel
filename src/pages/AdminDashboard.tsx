@@ -109,6 +109,7 @@ export function AdminDashboard() {
   };
 
       const [newUserCategories, setNewUserCategories] = useState<string[]>([]);
+  const [newUserPosts, setNewUserPosts] = useState<string[]>([]);
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(null);
   const [participantToDelete, setParticipantToDelete] = useState<string | null>(null);
@@ -772,7 +773,8 @@ export function AdminDashboard() {
     setEditingUserId(null);
     setNewUserEmail('');
     setNewUserPass('');
-    setNewUserCategories([]);
+    setNewUserPosts([]);
+    
     setIsUserModalOpen(false);
   };
 
@@ -782,6 +784,8 @@ export function AdminDashboard() {
     setNewUserPass('');
     setNewUserRole(u.role as 'admin' | 'admin_leaderboard' | 'judge');
             setNewUserCategories((u.assignedCategories && u.assignedCategories.length > 0) ? u.assignedCategories : (u.role === 'judge' ? CATEGORIES : []));
+    
+    setNewUserPosts((u.assignedPosts && u.assignedPosts.length > 0) ? u.assignedPosts : (u.role === 'judge' ? ['Juri 1', 'Juri 2'] : []));
     setIsUserModalOpen(true);
   };
 
@@ -974,6 +978,10 @@ export function AdminDashboard() {
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUserEmail) return;
+    if (newUserRole === 'judge' && (newUserCategories.length === 0 || newUserPosts.length === 0)) {
+      showToast("Pilih minimal satu kategori dan satu tugas untuk juri", 'error');
+      return;
+    }
     if (newUserRole === 'judge' && newUserCategories.length === 0) {
       showToast("Pilih minimal satu kategori untuk juri", 'error');
       return;
@@ -986,7 +994,8 @@ export function AdminDashboard() {
       const payload: any = {
         email: processedEmail,
         role: newUserRole,
-                        assignedCategories: newUserRole === 'judge' ? newUserCategories : null
+                        assignedCategories: newUserRole === 'judge' ? newUserCategories : null,
+        assignedPosts: newUserRole === 'judge' ? newUserPosts : null
       };
       
       if (newUserPass) {
@@ -1032,6 +1041,8 @@ export function AdminDashboard() {
       setNewUserEmail('');
       setNewUserPass('');
       setNewUserCategories([]);
+    setNewUserPosts([]);
+    
       setIsUserModalOpen(false);
     } catch (err: any) {
       console.error(err);
@@ -2016,10 +2027,11 @@ export function AdminDashboard() {
                             }}
                           />
                         </th>
-                        <th className="px-1 sm:px-3 py-2 font-medium">No.</th>
-                        <th className="px-4 py-3 font-medium cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => requestUserSort('username')}>Nama Pengguna</th>
-                        <th className="px-4 py-3 font-medium cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => requestUserSort('role')}>Peran</th>
-                                                <th className="px-4 py-3 font-medium rounded-tr-md cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => requestUserSort('categories')}>Kategori Akses</th>
+                        <th className="px-1 sm:px-3 py-2 font-medium">NO.</th>
+                        <th className="px-4 py-3 font-medium cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => requestUserSort('username')}>NAMA PENGGUNA</th>
+                        <th className="px-4 py-3 font-medium cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => requestUserSort('role')}>PERAN</th>
+                                                <th className="px-4 py-3 font-medium cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => requestUserSort('categories')}>KATEGORI AKSES</th>
+                        <th className="px-4 py-3 font-medium rounded-tr-md cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => requestUserSort('posts')}>TUGAS JURI</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -2106,11 +2118,24 @@ export function AdminDashboard() {
                               <span className="text-slate-400">Semua Akses</span>
                             )}
                           </td>
+                          <td className="px-4 py-3">
+                            {u.role === 'judge' && u.assignedPosts ? (
+                              <div className="flex flex-wrap gap-1 justify-center">
+                                {u.assignedPosts.map(p => (
+                                  <span key={p} className="bg-indigo-50 text-indigo-600 text-xs px-2 py-1 rounded-full border border-indigo-200">
+                                    {p}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 text-xs italic text-center block">-</span>
+                            )}
+                          </td>
                         </tr>
                       ))}
                       {appUsers.length === 0 && (
                         <tr>
-                          <td colSpan={5} className="px-4 py-8 text-center text-slate-500">
+                          <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
                             Belum ada akun terdaftar
                           </td>
                         </tr>
@@ -2751,6 +2776,27 @@ export function AdminDashboard() {
                     </div>
                     {newUserRole === 'judge' && (
                       <>
+                        <div className="pt-2 border-t"><label className="text-sm font-medium text-slate-700 mb-2 block">Tugas Penilaian</label>
+                          <div className="space-y-2 p-2 border rounded-md bg-slate-50 mb-4">
+                            {['Juri 1', 'Juri 2'].map(post => (
+                              <label key={post} className="flex items-center space-x-2">
+                                <input
+                                  type="checkbox"
+                                  checked={newUserPosts.includes(post)}
+                                  onChange={e => {
+                                    if (e.target.checked) {
+                                      setNewUserPosts(prev => [...prev, post]);
+                                    } else {
+                                      setNewUserPosts(prev => prev.filter(p => p !== post));
+                                    }
+                                  }}
+                                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-600"
+                                />
+                                <span className="text-sm text-slate-700">{post}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </div>
                         <div className="pt-2 border-t">
 <label className="text-sm font-medium text-slate-700 mb-2 block">Kategori Peserta yang Dinilai</label>
                           <div className="space-y-2 max-h-[150px] overflow-y-auto p-2 border rounded-md bg-slate-50">
@@ -2762,8 +2808,10 @@ export function AdminDashboard() {
                                   onChange={e => {
                                     if (e.target.checked) {
                                       setNewUserCategories(prev => [...prev, cat]);
+    
                                     } else {
                                       setNewUserCategories(prev => prev.filter(c => c !== cat));
+    
                                     }
                                   }}
                                   className="rounded border-slate-300 text-blue-600 focus:ring-blue-600"

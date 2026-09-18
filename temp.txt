@@ -1,0 +1,11 @@
+
+  const handleShowLocalToast = (message: string, e: React.MouseEvent) => {
+    setLocalToast({ message, x: e.clientX, y: e.clientY });
+    setTimeout(() => setLocalToast(null), 2500);
+  };
+
+      const [newUserCategories, setNewUserCategories] = useState<string[]>([]);
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [selectedParticipantId, setSelectedParticipantId] = useState<string | null>(null);
+  const [participantToDelete, setParticipantToDelete] = useState<string | null>(null);
+  const [participantToReset, setParticipantToReset] = useState<any>(null);
