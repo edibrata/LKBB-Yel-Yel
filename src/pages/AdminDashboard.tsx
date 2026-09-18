@@ -445,48 +445,85 @@ export function AdminDashboard() {
     
     pdfGroups.forEach(group => {
       tableData.push([
-        { content: group.title, colSpan: 3, styles: { fontStyle: 'bold', fillColor: [240, 240, 240], cellPadding: 2 } }
+        { content: group.title, colSpan: 4, styles: { fontStyle: 'bold', fillColor: [240, 240, 240], cellPadding: 2 } }
       ]);
       const groupCriteria = criteriaDef.filter((c: any) => c.id.startsWith(group.prefix));
       groupCriteria.forEach((crit: any, index: number) => {
+        const numberStr = groupCriteria.length > 1 ? (index + 1) + '.' : '';
         tableData.push([
-          { content: `${groupCriteria.length > 1 ? (index + 1) + '. ' : ''}${crit.name}\n ${crit.desc}`, styles: { cellPadding: { left: 5, top: 1, bottom: 1, right: 1.5 } } },
+          { content: numberStr, styles: { cellPadding: { left: 1.5, top: 1.5, bottom: 1.5, right: 1 }, halign: 'right' } },
+          { content: `${crit.name}\n${crit.desc}`, styles: { cellPadding: { left: 1, top: 1.5, bottom: 1.5, right: 1.5 } } },
           { content: s1?.criteriaScores?.[crit.id] ?? '-', styles: { halign: 'center', valign: 'middle', fontStyle: 'bold', cellPadding: 1.5 } },
           { content: s2?.criteriaScores?.[crit.id] ?? '-', styles: { halign: 'center', valign: 'middle', fontStyle: 'bold', cellPadding: 1.5 } }
         ]);
       });
     });
-
     tableData.push([
-      { content: 'Total Nilai (Sebelum Penalti)', styles: { fontStyle: 'bold', halign: 'right', fillColor: [250, 250, 250], cellPadding: 2 } },
+      { content: 'Total Nilai (Sebelum Penalti)', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right', fillColor: [250, 250, 250], cellPadding: 2 } },
       { content: s1 ? (Number.isInteger(raw1) ? raw1 : Number(raw1).toFixed(2)) : '-', styles: { fontStyle: 'bold', halign: 'center', fillColor: [250, 250, 250], cellPadding: 2 } },
       { content: s2 ? (Number.isInteger(raw2) ? raw2 : Number(raw2).toFixed(2)) : '-', styles: { fontStyle: 'bold', halign: 'center', fillColor: [250, 250, 250], cellPadding: 2 } }
     ]);
     
     tableData.push([
-      { content: maxExcess > 0 ? `Penalti Waktu (Kelebihan: ${maxExcess} dtk)` : 'Penalti Waktu (Aman/Tepat Waktu)', styles: { fontStyle: 'bold', halign: 'right', fillColor: [255, 240, 240], cellPadding: 2 } },
+      { content: maxExcess > 0 ? `Penalti Waktu (Kelebihan: ${maxExcess} dtk)` : 'Penalti Waktu (Aman/Tepat Waktu)', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right', fillColor: [255, 240, 240], cellPadding: 2 } },
       { content: totalPenalty > 0 ? `-${totalPenalty.toFixed(2)}` : '-', styles: { fontStyle: 'bold', halign: 'center', textColor: [200,0,0], fillColor: [255, 240, 240], cellPadding: 2 } },
       { content: totalPenalty > 0 ? `-${totalPenalty.toFixed(2)}` : '-', styles: { fontStyle: 'bold', halign: 'center', textColor: [200,0,0], fillColor: [255, 240, 240], cellPadding: 2 } }
     ]);
     
     tableData.push([
-      { content: 'NILAI AKHIR GABUNGAN', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right', fillColor: [220, 240, 220], cellPadding: 3, fontSize: 11 } },
+      { content: 'NILAI AKHIR GABUNGAN', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right', fillColor: [220, 240, 220], cellPadding: 3, fontSize: 11 } },
       { content: Number.isInteger(grandTotal) ? grandTotal : Number(grandTotal).toFixed(2), styles: { fontStyle: 'bold', halign: 'center', fillColor: [220, 240, 220], cellPadding: 3, fontSize: 11 } }
     ]);
 
     autoTable(doc, {
       startY: currentY,
-      head: [['Kriteria Penilaian', 'Juri 1', 'Juri 2']],
+      head: [[{content: 'Kriteria Penilaian', colSpan: 2}, 'Juri 1', 'Juri 2']],
       body: tableData,
       theme: 'grid',
       headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
       columnStyles: {
-        0: { cellWidth: 130 },
-        1: { cellWidth: 26 },
-        2: { cellWidth: 26 }
+        0: { cellWidth: 5 },
+        1: { cellWidth: 125 },
+        2: { cellWidth: 26 },
+        3: { cellWidth: 26 }
       },
       styles: { fontSize: 8.5, cellPadding: 1.5, lineColor: [200, 200, 200] },
       margin: { left: 14, right: 14 },
+      didParseCell: (data: any) => {
+        if (data.section === 'body' && data.row.raw.length === 4) {
+          if (data.column.index === 0) {
+            data.cell.styles.lineWidth = { top: 0.1, right: 0, bottom: 0.1, left: 0.1 };
+          } else if (data.column.index === 1) {
+            data.cell.styles.lineWidth = { top: 0.1, right: 0.1, bottom: 0.1, left: 0 };
+          }
+        }
+      },
+      didDrawPage: (data: any) => {
+        const pageSize = doc.internal.pageSize;
+        const pageHeight = pageSize.height ? pageSize.height : pageSize.getHeight();
+        const pageWidth = pageSize.width ? pageSize.width : pageSize.getWidth();
+        const footerY = pageHeight - 15;
+        
+        doc.setDrawColor(200, 200, 200);
+        doc.setLineWidth(0.5);
+        doc.line(14, footerY - 5, pageWidth - 14, footerY - 5);
+        
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
+        doc.setTextColor(120, 120, 120);
+
+        const now = new Date();
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const timeStr = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())} ${pad(now.getHours())}.${pad(now.getMinutes())}.${pad(now.getSeconds())}`;
+        
+        doc.text(timeStr, 14, footerY);
+        
+        const pageStr = `Hal. ${data.pageNumber} dari ${doc.internal.getNumberOfPages()}`;
+        doc.text(pageStr, pageWidth / 2, footerY, { align: 'center' });
+        
+        const pInfo = `${participant.number} ${participant.name}`;
+        doc.text(pInfo, pageWidth - 14, footerY, { align: 'right' });
+      }
     });
 
     if (autoDownload) {
