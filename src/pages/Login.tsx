@@ -134,10 +134,10 @@ export function Login() {
             />
           </div>
           <CardTitle className="text-2xl font-extrabold tracking-tight text-slate-900 mb-0.5">
-            SIMBARIS
+            LKBB DAN YEL-YEL
           </CardTitle>
           <CardDescription className="text-slate-500 font-medium text-sm px-4 leading-tight">
-            Penilaian Pos Pemberangkatan: LKBB dan Yel-Yel<br/>Penjelajahan Pramuka Penggalang Sukaresmi 2026
+            Penilaian Pos Pemberangkatan<br/>Penjelajahan Pramuka Penggalang Sukaresmi 2026
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4 px-8 pb-6 pt-4">
