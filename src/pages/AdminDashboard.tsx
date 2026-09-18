@@ -8,6 +8,7 @@ import { Input } from '../components/ui/input';
 import { CATEGORIES, SCORING_CRITERIA, FLAT_CRITERIA } from '../lib/constants';
 import { Maximize, Minimize, LogOut, Download, Plus, Search, Check, AlertCircle, Upload, Users, UserCog, ClipboardList, Eye, EyeOff, Edit2, Trash2, FileText, Printer, FileDown, Trophy, Info, RotateCcw, X, BarChart3 } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
+import AuditEvaluasi from "../components/AuditEvaluasi";
 import { utils, writeFile, read } from 'xlsx';
 import ExcelJS from 'exceljs';
 import jsPDF from 'jspdf';
@@ -1222,20 +1223,610 @@ export function AdminDashboard() {
     return `${name} ${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())} ${pad(now.getHours())}.${pad(now.getMinutes())}.${pad(now.getSeconds())}.${ext}`;
   };
 
-  const exportDaftarPesertaExcel = async () => {
-    showToast("Fitur ekspor daftar peserta dalam perbaikan.", 'success');
+    const exportDaftarPesertaExcel = async () => {
+    try {
+      const workbook = new ExcelJS.Workbook();
+      
+      CATEGORIES.forEach(category => {
+        const catParticipants = participants.filter(p => p.category === category);
+        if (catParticipants.length === 0) return;
+        
+        const worksheet = workbook.addWorksheet(category.substring(0, 31).replace(/[\\/*?:\[\]]/g, ''));
+        worksheet.columns = [
+          { header: 'No', key: 'idx', width: 5 },
+          { header: 'No. Undian', key: 'number', width: 15 },
+          { header: 'Nama Pangkalan / Regu', key: 'name', width: 40 },
+          { header: 'Kategori', key: 'category', width: 20 },
+        ];
+        
+        worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } };
+        worksheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
+        
+        catParticipants.sort((a, b) => a.number.localeCompare(b.number)).forEach((p, idx) => {
+          worksheet.addRow({
+            idx: idx + 1,
+            number: p.number,
+            name: p.name,
+            category: p.category
+          });
+        });
+        
+        worksheet.eachRow((row, rowNumber) => {
+          row.eachCell((cell) => {
+            cell.border = {
+              top: {style:'thin'},
+              left: {style:'thin'},
+              bottom: {style:'thin'},
+              right: {style:'thin'}
+            };
+          });
+        });
+      });
+
+      if (workbook.worksheets.length === 0) {
+        showToast('Belum ada data peserta untuk diekspor', 'error');
+        return;
+      }
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", generateExportFilename("Daftar Peserta LKBB", "xlsx"));
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch(err) {
+      console.error(err);
+      showToast('Gagal mengekspor daftar peserta', 'error');
+    }
   };
 
-  const exportFormatPenilaian = async () => {
-    showToast("Fitur cetak blanko dalam perbaikan.", 'success');
+    const exportFormatPenilaian = async () => {
+    try {
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const criteriaDef = FLAT_CRITERIA;
+      if (!criteriaDef) return;
+      
+      const pdfGroups = [
+        { title: "A. Kerapihan (10%)", prefix: "kerapihan_" },
+        { title: "B. Gerakan di Tempat dan Berpindah Tempat (40%)", prefix: "gerakan_" },
+        { title: "C. Gerakan Variasi, Formasi dan Yel-Yel (40%)", prefix: "variasi_" },
+        { title: "D. Ketepatan Waktu (10%)", prefix: "waktu_" }
+      ];
+
+      const tableData = [];
+      pdfGroups.forEach(group => {
+        tableData.push([
+          { content: group.title, colSpan: 3, styles: { fontStyle: 'bold', fillColor: [240, 240, 240], cellPadding: 2 } }
+        ]);
+        const groupCriteria = criteriaDef.filter(c => c.id.startsWith(group.prefix));
+        groupCriteria.forEach((crit, index) => {
+          const numberStr = groupCriteria.length > 1 ? (index + 1) + '.' : '';
+          tableData.push([
+            { content: numberStr, styles: { cellPadding: { left: 1.5, top: 1.5, bottom: 1.5, right: 1 }, halign: 'right' } },
+            { content: `${crit.name}\n${crit.desc}`, styles: { cellPadding: { left: 1, top: 1.5, bottom: 1.5, right: 1.5 } } },
+            { content: ' ', styles: { halign: 'center', valign: 'middle' } }
+          ]);
+        });
+      });
+      
+      tableData.push([
+        { content: 'Total Nilai (Sebelum Penalti)', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right', fillColor: [250, 250, 250], cellPadding: 2 } },
+        { content: ' ', styles: { fillColor: [250, 250, 250] } }
+      ]);
+      
+      tableData.push([
+        { content: 'Penalti Waktu', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right', fillColor: [255, 240, 240], cellPadding: 2 } },
+        { content: ' ', styles: { fillColor: [255, 240, 240] } }
+      ]);
+      
+      tableData.push([
+        { content: 'NILAI AKHIR', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right', fillColor: [220, 240, 220], cellPadding: 3, fontSize: 11 } },
+        { content: ' ', styles: { fillColor: [220, 240, 220] } }
+      ]);
+      
+      if (participants.length === 0) {
+        showToast('Belum ada data peserta', 'error');
+        return;
+      }
+      
+      const sortedParticipants = [...participants].sort((a,b) => a.number.localeCompare(b.number));
+      
+      sortedParticipants.forEach((p, idx) => {
+        if (idx > 0) doc.addPage();
+        
+        doc.setFontSize(14);
+        doc.setFont("helvetica", "bold");
+        doc.text("BLANKO PENILAIAN JURI", 105, 15, { align: 'center' });
+        doc.text("LKBB DAN YEL-YEL", 105, 21, { align: 'center' });
+        
+        doc.setFontSize(10.5);
+        doc.setFont("helvetica", "normal");
+        doc.text("Kategori", 14, 30); doc.text(`: ${p.category}`, 45, 30);
+        doc.text("Nomor Peserta", 14, 35); doc.text(`: ${p.number}`, 45, 35);
+        
+        
+        
+        autoTable(doc, {
+          startY: 40,
+          head: [[{content: 'Kriteria Penilaian', colSpan: 2}, 'Nilai']],
+          body: tableData,
+          theme: 'grid',
+          headStyles: { fillColor: [40, 40, 40], textColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
+          columnStyles: {
+            0: { cellWidth: 5 },
+            1: { cellWidth: 145 },
+            2: { cellWidth: 32 }
+          },
+          styles: { fontSize: 8.5, cellPadding: 1.5, lineColor: [200, 200, 200] },
+          margin: { left: 14, right: 14 },
+          didParseCell: (data) => {
+            if (data.section === 'body' && data.row.raw.length === 3) {
+              if (data.column.index === 0) {
+                data.cell.styles.lineWidth = { top: 0.1, right: 0, bottom: 0.1, left: 0.1 };
+              } else if (data.column.index === 1) {
+                data.cell.styles.lineWidth = { top: 0.1, right: 0.1, bottom: 0.1, left: 0 };
+              }
+            }
+          },
+          didDrawPage: (data) => {
+            const pageSize = doc.internal.pageSize;
+            const pageHeight = pageSize.height ? pageSize.height : pageSize.getHeight();
+            const pageWidth = pageSize.width ? pageSize.width : pageSize.getWidth();
+            const footerY = pageHeight - 15;
+            
+            doc.setDrawColor(200, 200, 200);
+            doc.setLineWidth(0.5);
+            doc.line(14, footerY - 5, pageWidth - 14, footerY - 5);
+            
+            doc.setFontSize(9);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(120, 120, 120);
+            
+            doc.text("Format Penilaian LKBB & Yel-Yel", 14, footerY);
+            
+            const pageStr = `Hal. ${data.pageNumber} dari ${doc.internal.getNumberOfPages()}`;
+            doc.text(pageStr, pageWidth / 2, footerY, { align: 'center' });
+            
+            const pInfo = `${p.number} ${p.category}`;
+            doc.text(pInfo, pageWidth - 14, footerY, { align: 'right' });
+          }
+        });
+        
+                // Add signature box
+        let finalY = ((doc as any).lastAutoTable?.finalY || 240) + 8; // Dikurangi dari 15 ke 8 agar lebih compact
+        if (finalY > 260) {
+          doc.addPage();
+          finalY = 30;
+        }
+        doc.setFontSize(10);
+        doc.text("Sukaresmi, ........................... 202...", 130, finalY); // Serang -> Sukaresmi
+        doc.text("Juri Penilai,", 145, finalY + 4); // Jarak dikompres
+        doc.text("( .......................................... )", 130, finalY + 22); // Jarak kurung ditarik ke atas
+      });
+      
+      doc.save(generateExportFilename("Blanko Penilaian LKBB", "pdf"));
+      showToast('Berhasil mengekspor blanko penilaian', 'success');
+    } catch(err) {
+      console.error(err);
+      showToast('Gagal mengekspor blanko penilaian', 'error');
+    }
   };
 
-  const exportHasilLomba = async () => {
-    showToast("Fitur ekspor hasil lomba dalam perbaikan.", 'success');
+            const exportHasilLomba = async () => {
+    try {
+      const doc = new jsPDF('p', 'mm', 'a4');
+      if (participants.length === 0) {
+        showToast('Belum ada data peserta', 'error');
+        return;
+      }
+      
+      const dateStr = "19 September 2026";
+      const dayStr = "Sabtu";
+      const year = "2026";
+      
+      // Cari Juri yang benar-benar memberikan nilai
+      const judgeIdsWithScores = Array.from(new Set(scores.map((s:any) => s.judgeId)));
+      const activeJudges = appUsers.filter(u => judgeIdsWithScores.includes(u.id) && u.role === 'judge');
+
+      const j1 = activeJudges.find(u => u.assignedPosts?.includes('Juri 1')) || activeJudges[0];
+      const j2 = activeJudges.find(u => u.assignedPosts?.includes('Juri 2')) || activeJudges.find(u => u.id !== j1?.id);
+
+      const juri1Name = j1 ? (j1.name || j1.email || j1.id) : ".........................";
+      const juri2Name = j2 ? (j2.name || j2.email || j2.id) : ".........................";
+
+      let validCategories = CATEGORIES.filter(category => {
+        const catGroup = groupedScores.find(g => g.category === category);
+        return catGroup && catGroup.participants.length > 0;
+      });
+
+      if (validCategories.length === 0) {
+        showToast('Belum ada data nilai untuk diekspor', 'error');
+        return;
+      }
+
+      // --- PAGE 1: BERITA ACARA ---
+      doc.setFont("times", "bold");
+      doc.setFontSize(12);
+      doc.text("BERITA ACARA HASIL LOMBA", 105, 25, { align: 'center' });
+      
+      doc.setFontSize(11);
+      doc.setFont("times", "normal");
+      
+      const baText = `Pada hari ini ${dayStr} tanggal Sembilan Belas bulan September tahun Dua Ribu Dua Puluh Enam bertempat di Cikuya Kecamatan Sukaresmi telah dilaksanakan Lomba Keterampilan Baris Berbaris (LKBB) dan Yel-Yel dalam Kegiatan Penjelajahan Pramuka Penggalang Tahun 2026.\n\nBerdasarkan kegiatan tersebut diperoleh hasil sebagaimana terlampir.\n\nDemikian Berita Acara ini dibuat untuk diketahui dan digunakan sebagaimana mestinya.`;
+      
+      const paragraphs = baText.split('\n\n');
+      let currentY = 40;
+      paragraphs.forEach(paragraph => {
+        if (paragraph.trim()) {
+          // jsPDF secara otomatis akan men-justify seluruh baris KECUALI baris terakhir
+          // jika kita memberikan string utuh (paragraf) beserta maxWidth
+          doc.text(paragraph, 25, currentY, { align: 'justify', maxWidth: 160 });
+          
+          const lines = doc.splitTextToSize(paragraph, 160);
+          // Tinggi bawaan jsPDF untuk size 11 adalah ~4.5mm per baris. 
+          // Ditambah jarak antar paragraf 4mm.
+          currentY += (lines.length * 4.5) + 4;
+        }
+      });
+      
+      doc.text(`Sukaresmi, ${dateStr}`, 105, 80, { align: 'center' });
+      
+      // Generate dynamic signature rows for judges
+      const signatureData: any[] = [
+        [1, "Mulyadi", "Ketua Kwarran", ""],
+        [2, "Deden Sanarudin", "Koordinator Kegiatan", ""],
+        [3, "Edi Brata, M.Pd.", "Koordinator LKBB dan Yel-Yel", ""]
+      ];
+
+      // Ambil semua juri yang aktif dari database
+      const allJudges = appUsers.filter(u => u.role === 'judge');
+      
+      // Prioritaskan juri resmi jika ada juri dengan nama sungguhan (bukan akun coba/test)
+      const realJudges = allJudges.filter(u => {
+        const username = (u.email || u.name || u.id || '').toLowerCase();
+        return !username.includes('coba') && !username.includes('test');
+      });
+      const activeJudgesList = realJudges.length > 0 ? realJudges : allJudges;
+
+      // Urutkan juri secara rapi: Putra terlebih dahulu, lalu Putri; Juri 1 lalu Juri 2
+      const sortedJudges = [...activeJudgesList].sort((a, b) => {
+        const catA = (a.assignedCategories || []).join(' ');
+        const catB = (b.assignedCategories || []).join(' ');
+        const postA = (a.assignedPosts || []).join(' ');
+        const postB = (b.assignedPosts || []).join(' ');
+        
+        if (catA.includes('Putra') && !catB.includes('Putra')) return -1;
+        if (!catA.includes('Putra') && catB.includes('Putra')) return 1;
+        return postA.localeCompare(postB);
+      });
+
+      let sigIndex = 4;
+      sortedJudges.forEach(j => {
+        const judgeName = (j.email || j.name || j.id || '').trim();
+        const posts = j.assignedPosts && j.assignedPosts.length > 0 ? j.assignedPosts.join(', ') : 'Juri';
+        const cats = j.assignedCategories || [];
+        
+        let roleStr = posts;
+        const isAllPutra = cats.length > 0 && cats.every((c) => c.toLowerCase().includes('putra'));
+        const isAllPutri = cats.length > 0 && cats.every((c) => c.toLowerCase().includes('putri'));
+        
+        // Format persis: [Juri 1 atau Juri 2] - [Kategori]
+        // Contoh: Juri 1 - SD & SMP Putra
+        const hasSDPutra = cats.includes('SD Putra');
+        const hasSMPPutra = cats.includes('SMP Putra');
+        const hasSDPutri = cats.includes('SD Putri');
+        const hasSMPPutri = cats.includes('SMP Putri');
+
+        if (hasSDPutra && hasSMPPutra) {
+          roleStr = `${posts} - SD & SMP Putra`;
+        } else if (hasSDPutri && hasSMPPutri) {
+          roleStr = `${posts} - SD & SMP Putri`;
+        } else if (cats.length === 1) {
+          roleStr = `${posts} - ${cats[0]}`;
+        } else if (cats.length > 0) {
+          roleStr = `${posts} - ${cats.join(' & ')}`;
+        } else {
+          roleStr = posts;
+        }
+
+        signatureData.push([
+          sigIndex++,
+          judgeName || ".........................",
+          roleStr,
+          ""
+        ]);
+      });
+
+      // Fallback jika belum ada juri sama sekali di database
+      if (sortedJudges.length === 0) {
+        signatureData.push([sigIndex++, ".........................", "Juri 1", ""]);
+        signatureData.push([sigIndex++, ".........................", "Juri 2", ""]);
+      }
+
+      autoTable(doc, {
+        startY: 85,
+        head: [['No.', 'Nama', 'Jabatan', 'Tanda Tangan']],
+        body: signatureData,
+        theme: 'plain',
+        styles: { font: 'times', fontSize: 11, textColor: [0, 0, 0] },
+        headStyles: { fontStyle: 'bold', halign: 'center', lineWidth: { top: 0.8, bottom: 0.4 }, lineColor: [0, 0, 0] },
+        bodyStyles: { minCellHeight: 15, valign: 'middle' },
+        columnStyles: {
+          0: { cellWidth: 15, halign: 'center' },
+          1: { cellWidth: 50 },
+          2: { cellWidth: 65, halign: 'center' },
+          3: { cellWidth: 40 }
+        },
+        margin: { left: 20, right: 20 },
+        didDrawCell: (data) => {
+          if (data.section === 'body' && data.column.index === 3) {
+            doc.setDrawColor(0, 0, 0);
+            doc.setLineWidth(0.3);
+            let yPos = data.cell.y + (data.cell.height / 2) + 2;
+            let xPos = data.cell.x + 5;
+            let xEnd = data.cell.x + data.cell.width - 5;
+            
+            if (data.row.index % 2 === 0) {
+              xEnd = xPos + 20;
+            } else {
+              xPos = xEnd - 20;
+            }
+            doc.line(xPos, yPos, xEnd, yPos);
+          }
+        }
+      });
+      
+      doc.setFontSize(10);
+      doc.text(`Hal. 1 dari ${validCategories.length + 2}`, 105, 285, { align: 'center' });
+
+      // --- PAGE 2: LAMPIRAN 1 (DAFTAR JUARA) ---
+      doc.addPage();
+      doc.setFont("times", "normal");
+      doc.setFontSize(11);
+      doc.text("Lampiran 1", 15, 20);
+      
+      doc.setFont("times", "bold");
+      doc.text("DAFTAR JUARA LKBB DAN YEL-YEL", 105, 30, { align: 'center' });
+      doc.text("DALAM KEGIATAN PENJELAJAHAN PRAMUKA PENGGALANG", 105, 35, { align: 'center' });
+      doc.text("TINGKAT KECAMATAN SUKARESMI TAHUN " + year, 105, 40, { align: 'center' });
+      
+      const juaraData = [];
+      let catCounter = 1;
+      
+      validCategories.forEach((category) => {
+        const catGroup = groupedScores.find(g => g.category === category);
+        if (catGroup && catGroup.participants.length > 0) {
+          let top3 = catGroup.participants.filter(p => p.rank !== '-' && parseInt(p.rank.toString()) <= 3);
+          top3.sort((a, b) => parseInt(a.rank.toString()) - parseInt(b.rank.toString()));
+          
+          if (top3.length > 0) {
+            top3.forEach((p, idx) => {
+              const r = parseInt(p.rank.toString());
+              const rankStr = r === 1 ? 'I' : r === 2 ? 'II' : r === 3 ? 'III' : p.rank;
+              const nilaiStr = Number.isInteger(p.grandTotal) ? p.grandTotal : p.grandTotal.toFixed(2);
+              
+              if (idx === 0) {
+                juaraData.push([
+                  { content: catCounter, rowSpan: top3.length, styles: { halign: 'center', valign: 'middle' } },
+                  { content: category, rowSpan: top3.length, styles: { valign: 'middle' } },
+                  rankStr,
+                  nilaiStr,
+                  p.number,
+                  p.name
+                ]);
+              } else {
+                juaraData.push([
+                  rankStr,
+                  nilaiStr,
+                  p.number,
+                  p.name
+                ]);
+              }
+            });
+            catCounter++;
+          }
+        }
+      });
+
+      autoTable(doc, {
+        startY: 50,
+        head: [['No.', 'Kategori', 'Juara', 'Nilai', 'Nomor\nPeserta', 'Pangkalan / Regu']],
+        body: juaraData,
+        theme: 'grid',
+        styles: { font: 'times', fontSize: 9.5, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.3, cellPadding: 1.5 },
+        headStyles: { fillColor: [255, 255, 255], fontStyle: 'bold', halign: 'center', valign: 'middle' },
+        columnStyles: {
+          0: { cellWidth: 10, halign: 'center' },
+          1: { cellWidth: 40 },
+          2: { cellWidth: 15, halign: 'center', valign: 'middle' },
+          3: { cellWidth: 15, halign: 'center', valign: 'middle' },
+          4: { cellWidth: 20, halign: 'center', valign: 'middle' },
+          5: { cellWidth: 'auto', valign: 'middle' }
+        },
+        margin: { left: 15, right: 15 }
+      });
+
+      let finalY1 = ((doc as any).lastAutoTable?.finalY || 240) + 10;
+      doc.setFontSize(10);
+      doc.setFont("times", "normal");
+      doc.text("Catatan:", 15, finalY1);
+      doc.text("Sesuai ketentuan, bahwa apabila terdapat total nilai yang sama, penentuan peringkat didasarkan berturut-turut pada akumulasi nilai tertinggi juri dan pengurangan penalti yang lebih kecil.", 15, finalY1 + 5, { maxWidth: 180, align: 'justify' });
+      
+      doc.text(`Sukaresmi, ${dateStr}`, 140, finalY1 + 25);
+      doc.text("Koordinator,", 140, finalY1 + 30);
+      doc.setFont("times", "bold");
+      doc.text("Edi Brata, M.Pd.", 140, finalY1 + 50);
+      doc.setFont("times", "normal");
+      
+      doc.text(`Hal. 2 dari ${validCategories.length + 2}`, 105, 285, { align: 'center' });
+
+      // --- PAGE 3+: LAMPIRAN 2, 3... (REKAPITULASI NILAI) ---
+      validCategories.forEach((category, catIdx) => {
+        const catGroup = groupedScores.find(g => g.category === category);
+        
+        doc.addPage();
+        doc.setFontSize(11);
+        doc.text(`Lampiran ${catIdx + 2}`, 15, 20);
+        
+        doc.setFont("times", "bold");
+        doc.text("REKAPITULASI NILAI LKBB DAN YEL-YEL", 105, 30, { align: 'center' });
+        doc.text("DALAM KEGIATAN PENJELAJAHAN PRAMUKA PENGGALANG", 105, 35, { align: 'center' });
+        doc.text("TINGKAT KECAMATAN SUKARESMI TAHUN " + year, 105, 40, { align: 'center' });
+        doc.text(`KATEGORI ${category.toUpperCase()}`, 105, 45, { align: 'center' });
+        
+        const tableData = [];
+        
+        let sortedParticipants = [...catGroup.participants].sort((a,b) => {
+           let aR = a.rank === '-' ? 999 : parseInt(a.rank);
+           let bR = b.rank === '-' ? 999 : parseInt(b.rank);
+           if (aR !== bR) return aR - bR;
+           return a.number.localeCompare(b.number);
+        });
+
+        sortedParticipants.forEach((p, index) => {
+          tableData.push([
+            index + 1,
+            p.number,
+            p.name,
+            Number.isInteger(p.juri1Total) ? p.juri1Total : p.juri1Total.toFixed(2),
+            Number.isInteger(p.juri2Total) ? p.juri2Total : p.juri2Total.toFixed(2),
+            p.totalPenalty > 0 ? `-${p.totalPenalty.toFixed(2)}` : '-',
+            Number.isInteger(p.grandTotal) ? p.grandTotal : p.grandTotal.toFixed(2),
+            p.isDisqualified ? 'Diskualifikasi' : (p.rank !== '-' ? p.rank : '-')
+          ]);
+        });
+        
+        autoTable(doc, {
+          startY: 55,
+          head: [[
+            { content: 'Nomor', colSpan: 2, styles: { halign: 'center' } },
+            { content: 'Pangkalan / Regu', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
+            { content: 'Nilai', colSpan: 4, styles: { halign: 'center' } },
+            { content: 'Rank', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } }
+          ], [
+            { content: 'Urut', styles: { halign: 'center' } },
+            { content: 'Peserta', styles: { halign: 'center' } },
+            { content: 'Juri 1', styles: { halign: 'center' } },
+            { content: 'Juri 2', styles: { halign: 'center' } },
+            { content: 'Penalti', styles: { halign: 'center' } },
+            { content: 'Jumlah', styles: { halign: 'center' } }
+          ]],
+          body: tableData,
+          theme: 'grid',
+          styles: { font: 'times', fontSize: 9, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.3, cellPadding: 1 },
+          headStyles: { fillColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
+          columnStyles: {
+            0: { cellWidth: 12, halign: 'center' },
+            1: { cellWidth: 15, halign: 'center' },
+            2: { cellWidth: 'auto' },
+            3: { cellWidth: 16, halign: 'center' },
+            4: { cellWidth: 16, halign: 'center' },
+            5: { cellWidth: 16, halign: 'center' },
+            6: { cellWidth: 16, halign: 'center' },
+            7: { cellWidth: 12, halign: 'center' }
+          },
+          margin: { left: 15, right: 15 }
+        });
+        
+        let finalY2 = ((doc as any).lastAutoTable?.finalY || 240) + 15;
+        if (finalY2 > 250) {
+            doc.addPage();
+            finalY2 = 30;
+        }
+        
+        doc.setFont("times", "normal");
+        doc.setFontSize(10);
+        doc.text(`Sukaresmi, ${dateStr}`, 140, finalY2);
+        doc.text("Koordinator,", 140, finalY2 + 5);
+        doc.setFont("times", "bold");
+        doc.text("Edi Brata, M.Pd.", 140, finalY2 + 25);
+        doc.setFont("times", "normal");
+        
+        doc.text(`Hal. ${catIdx + 3} dari ${validCategories.length + 2}`, 105, 285, { align: 'center' });
+      });
+      
+      doc.save(generateExportFilename("Hasil Lomba LKBB", "pdf"));
+      showToast('Berhasil mengekspor hasil lomba', 'success');
+    } catch(err) {
+      console.error(err);
+      showToast('Gagal mengekspor hasil lomba', 'error');
+    }
   };
 
   const exportToXLSX = async () => {
-    showToast("Fitur ekspor XLSX dalam perbaikan.", 'success');
+    try {
+      const workbook = new ExcelJS.Workbook();
+      
+      let hasData = false;
+      CATEGORIES.forEach(category => {
+        const catGroup = groupedScores.find(g => g.category === category);
+        if (!catGroup || catGroup.participants.length === 0) return;
+        
+        hasData = true;
+        const worksheet = workbook.addWorksheet(category.substring(0, 31).replace(/[\\/*?:\[\]]/g, ''));
+        
+        worksheet.columns = [
+          { header: 'Rank', key: 'rank', width: 8 },
+          { header: 'No. Undian', key: 'number', width: 12 },
+          { header: 'Pangkalan / Regu', key: 'name', width: 40 },
+          { header: 'Juri 1', key: 'juri1', width: 12 },
+          { header: 'Juri 2', key: 'juri2', width: 12 },
+          { header: 'Penalti', key: 'penalty', width: 12 },
+          { header: 'Nilai Akhir', key: 'final', width: 15 },
+          { header: 'Keterangan', key: 'status', width: 25 },
+        ];
+        
+        worksheet.getRow(1).font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        worksheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF10B981' } };
+        worksheet.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
+        
+        catGroup.participants.forEach((p, idx) => {
+          worksheet.addRow({
+            rank: p.rank !== '-' ? p.rank : '-',
+            number: p.number,
+            name: p.name,
+            juri1: p.juri1Total,
+            juri2: p.juri2Total,
+            penalty: p.totalPenalty > 0 ? -p.totalPenalty : 0,
+            final: p.grandTotal,
+            status: p.isDisqualified ? p.disqualificationReason || 'Diskualifikasi' : (p.rank !== '-' ? `Juara ${p.rank}` : '-')
+          });
+        });
+        
+        worksheet.eachRow((row, rowNumber) => {
+          row.eachCell((cell) => {
+            cell.border = {
+              top: {style:'thin'},
+              left: {style:'thin'},
+              bottom: {style:'thin'},
+              right: {style:'thin'}
+            };
+          });
+        });
+      });
+      
+      if (!hasData) {
+        showToast('Belum ada data nilai untuk diekspor', 'error');
+        return;
+      }
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", generateExportFilename("Rekap Hasil Lomba LKBB", "xlsx"));
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch(err) {
+      console.error(err);
+      showToast('Gagal mengekspor hasil lomba', 'error');
+    }
   };
 
   const exportFullRealDataExcel = async () => {
@@ -2262,179 +2853,8 @@ export function AdminDashboard() {
       )}
 
       {activeMainTab === 'statistik' && (
-        <div className="space-y-6 animate-in fade-in duration-300">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <Card className="bg-white shadow-sm border-slate-200">
-              <CardContent className="p-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-sm font-medium text-slate-500 mb-1">Total Regu Terdaftar</p>
-                    <h3 className="text-3xl font-bold text-slate-900">{participants.length}</h3>
-                  </div>
-                  <div className="p-3 bg-blue-50 rounded-lg">
-                    <Users className="w-6 h-6 text-blue-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-white shadow-sm border-slate-200">
-              <CardContent className="p-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-sm font-medium text-slate-500 mb-1">Kategori Lomba</p>
-                    <h3 className="text-3xl font-bold text-indigo-900">{CATEGORIES.length}</h3>
-                  </div>
-                  <div className="p-3 bg-indigo-50 rounded-lg">
-                    <ClipboardList className="w-6 h-6 text-indigo-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-white shadow-sm border-slate-200">
-              <CardContent className="p-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-sm font-medium text-slate-500 mb-1">Regu Selesai Dinilai</p>
-                    <h3 className="text-3xl font-bold text-green-600">
-                      {participants.filter(p => {
-                        const pScores = scores.filter(s => s.participantId === p.id);
-                        return pScores.length >= appUsers.filter(u => u.role === "judge").length && pScores.length > 0;
-                      }).length}
-                    </h3>
-                  </div>
-                  <div className="p-3 bg-green-50 rounded-lg">
-                    <Check className="w-6 h-6 text-green-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="bg-white shadow-sm border-slate-200">
-              <CardContent className="p-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-sm font-medium text-slate-500 mb-1">Status Diskualifikasi</p>
-                    <h3 className="text-3xl font-bold text-red-600">{participants.filter(p => p.isDisqualified).length}</h3>
-                  </div>
-                  <div className="p-3 bg-red-50 rounded-lg">
-                    <AlertCircle className="w-6 h-6 text-red-600" />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 gap-6">
-            <Card className="bg-white shadow-sm border-slate-200">
-              <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
-                <CardTitle className="text-lg text-slate-800">Rincian Peserta per Kategori</CardTitle>
-              </CardHeader>
-              <CardContent className="p-6">
-                {participants.length > 0 ? (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                    {CATEGORIES.map((cat, idx) => {
-                      const count = participants.filter(p => p.category === cat).length;
-                      if (count === 0) return null;
-                      
-                      const colors = [
-                        'bg-blue-100 text-blue-800 border-blue-200',
-                        'bg-indigo-100 text-indigo-800 border-indigo-200',
-                        'bg-violet-100 text-violet-800 border-violet-200',
-                        'bg-purple-100 text-purple-800 border-purple-200',
-                        'bg-fuchsia-100 text-fuchsia-800 border-fuchsia-200',
-                        'bg-pink-100 text-pink-800 border-pink-200',
-                        'bg-rose-100 text-rose-800 border-rose-200'
-                      ];
-                      
-                      return (
-                        <div key={idx} className={`rounded-lg border p-4 flex flex-col items-center justify-center text-center ${colors[idx % colors.length]}`}>
-                          <span className="text-sm font-medium mb-1 line-clamp-1">{cat}</span>
-                          <span className="text-2xl font-bold">{count}</span>
-                          <span className="text-xs opacity-75">Regu</span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <div className="text-slate-400 text-center py-8">Belum ada data peserta</div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card className="bg-white shadow-sm border-slate-200">
-              <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
-                <CardTitle className="text-lg text-slate-800">Komposisi Peserta per Kategori</CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 flex justify-center items-center h-80">
-                {participants.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={CATEGORIES.map(cat => ({ name: cat, value: participants.filter(p => p.category === cat).length })).filter(d => d.value > 0)}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {CATEGORIES.map(cat => ({ name: cat, value: participants.filter(p => p.category === cat).length })).filter(d => d.value > 0).map((entry, index) => {
-                          const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ec4899', '#06b6d4', '#ef4444'];
-                          return <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />;
-                        })}
-                      </Pie>
-                      <RechartsTooltip formatter={(value) => [`${value} Regu`, 'Jumlah']} />
-                      <Legend verticalAlign="bottom" height={36} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="text-slate-400">Belum ada data peserta</div>
-                )}
-              </CardContent>
-            </Card>
-
-            <Card className="bg-white shadow-sm border-slate-200">
-              <CardHeader className="border-b border-slate-100 bg-slate-50/50 pb-4">
-                <CardTitle className="text-lg text-slate-800">Progres Penilaian Juri</CardTitle>
-              </CardHeader>
-              <CardContent className="p-6 h-80">
-                {participants.length > 0 ? (
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={CATEGORIES.map(cat => {
-                        const catParticipants = participants.filter(p => p.category === cat);
-                        let selesai = 0; let proses = 0; let belum = 0;
-                        catParticipants.forEach(p => {
-                          const pScores = scores.filter(s => s.participantId === p.id);
-                          const validPosCount = pScores.length;
-                          if (validPosCount === 2) selesai++;
-                          else if (validPosCount > 0) proses++;
-                          else belum++;
-                        });
-                        return { name: cat, Selesai: selesai, Proses: proses, Belum: belum };
-                      }).filter(d => d.Selesai > 0 || d.Proses > 0 || d.Belum > 0)}
-                      margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
-                    >
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                      <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                      <YAxis tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
-                      <RechartsTooltip cursor={{ fill: '#f1f5f9' }} />
-                      <Legend wrapperStyle={{ paddingTop: '20px' }} />
-                      <Bar dataKey="Selesai" stackId="a" fill="#10b981" radius={[0, 0, 4, 4]} />
-                      <Bar dataKey="Proses" stackId="a" fill="#f59e0b" />
-                      <Bar dataKey="Belum" stackId="a" fill="#e2e8f0" radius={[4, 4, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                ) : (
-                  <div className="flex h-full items-center justify-center text-slate-400">Belum ada data penilaian</div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+        <AuditEvaluasi participants={participants} scores={scores} appUsers={appUsers} />
       )}
-
       {activeMainTab === 'ekspor' && (
         <div className="space-y-6">
           <h2 className="text-xl font-semibold text-slate-800 border-b pb-2">Ekspor Laporan & Data</h2>
