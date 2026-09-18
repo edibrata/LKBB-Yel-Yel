@@ -1480,8 +1480,7 @@ export function AdminDashboard() {
       // Generate dynamic signature rows for judges
       const signatureData: any[] = [
         [1, "Mulyadi", "Ketua Kwarran", ""],
-        [2, "Deden Sanarudin", "Koordinator Kegiatan", ""],
-        [3, "Edi Brata, M.Pd.", "Koordinator LKBB dan Yel-Yel", ""]
+        [2, "Deden Sanarudin", "Koordinator Kegiatan", ""]
       ];
 
       // Ambil semua juri yang aktif dari database
@@ -1506,7 +1505,7 @@ export function AdminDashboard() {
         return postA.localeCompare(postB);
       });
 
-      let sigIndex = 4;
+      let sigIndex = 3;
       sortedJudges.forEach(j => {
         const judgeName = (j.email || j.name || j.id || '').trim();
         const posts = j.assignedPosts && j.assignedPosts.length > 0 ? j.assignedPosts.join(', ') : 'Juri';
@@ -1659,9 +1658,9 @@ export function AdminDashboard() {
       doc.text("Sesuai ketentuan, bahwa apabila terdapat total nilai yang sama, penentuan peringkat didasarkan berturut-turut pada akumulasi nilai tertinggi juri dan pengurangan penalti yang lebih kecil.", 15, finalY1 + 5, { maxWidth: 180, align: 'justify' });
       
       doc.text(`Sukaresmi, ${dateStr}`, 140, finalY1 + 25);
-      doc.text("Koordinator,", 140, finalY1 + 30);
+      doc.text("Koordinator Kegiatan,", 140, finalY1 + 30);
       doc.setFont("times", "bold");
-      doc.text("Edi Brata, M.Pd.", 140, finalY1 + 50);
+      doc.text("Deden Sanarudin", 140, finalY1 + 50);
       doc.setFont("times", "normal");
       
       doc.text(`Hal. 2 dari ${validCategories.length + 2}`, 105, 285, { align: 'center' });
@@ -1743,9 +1742,9 @@ export function AdminDashboard() {
         doc.setFont("times", "normal");
         doc.setFontSize(10);
         doc.text(`Sukaresmi, ${dateStr}`, 140, finalY2);
-        doc.text("Koordinator,", 140, finalY2 + 5);
+        doc.text("Koordinator Kegiatan,", 140, finalY2 + 5);
         doc.setFont("times", "bold");
-        doc.text("Edi Brata, M.Pd.", 140, finalY2 + 25);
+        doc.text("Deden Sanarudin", 140, finalY2 + 25);
         doc.setFont("times", "normal");
         
         doc.text(`Hal. ${catIdx + 3} dari ${validCategories.length + 2}`, 105, 285, { align: 'center' });
