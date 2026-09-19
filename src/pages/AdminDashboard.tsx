@@ -266,7 +266,7 @@ export function AdminDashboard() {
   }, []);
 
   useEffect(() => {
-    if (isSuperAdmin) {
+    if (canManageParticipants) {
       const q = query(collection(db, 'users'));
       const unsubscribe = onSnapshot(q, (snapshot) => {
         const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AppUserDoc));
@@ -276,7 +276,7 @@ export function AdminDashboard() {
       });
       return () => unsubscribe();
     }
-  }, [isSuperAdmin]);
+  }, [canManageParticipants]);
 
   useEffect(() => {
     if (canManageParticipants) {
@@ -2225,7 +2225,7 @@ export function AdminDashboard() {
 
         
         {/* Floating Action Button for Mobile Add User */}
-        {activeMainTab === 'users' && (
+        {activeMainTab === 'users' && isSuperAdmin && (
 
           <button
             onClick={() => setIsUserModalOpen(true)}
@@ -2609,7 +2609,7 @@ export function AdminDashboard() {
             </div>
           </div>
         )}
-        {activeMainTab === 'users' && (
+        {activeMainTab === 'users' && isSuperAdmin && (
           <div className="flex flex-col gap-8">
             <div className="w-full">
             <Card>
