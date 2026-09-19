@@ -15,6 +15,7 @@ import ExcelJS from 'exceljs';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, ResponsiveContainer } from 'recharts';
+import { formatScore, roundTwoDecimals } from '../lib/utils';
 
 interface Participant {
   id: string;
@@ -40,6 +41,7 @@ interface AppUserDoc {
   email: string; // we'll use this for username
   role: string;
   assignedCategories?: string[];
+  assignedPosts?: string[];
   password?: string;
 }
 
@@ -272,7 +274,12 @@ export function AdminDashboard() {
       }, (error) => {
         console.error("Firestore onSnapshot error (users):", error);
       });
-      
+      return () => unsubscribe();
+    }
+  }, [isSuperAdmin]);
+
+  useEffect(() => {
+    if (canManageParticipants) {
       const qLogs = query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(100));
       const unsubscribeLogs = onSnapshot(qLogs, (snapshot) => {
         const logs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -282,11 +289,10 @@ export function AdminDashboard() {
       });
 
       return () => {
-        unsubscribe();
         unsubscribeLogs();
       };
     }
-  }, [isSuperAdmin]);
+  }, [canManageParticipants]);
 
   const handleAddParticipant = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -397,7 +403,7 @@ export function AdminDashboard() {
     if (timers.length > 0) validTimer = Math.min(...timers);
     
     const maxExcess = Math.max(0, validTimer - 300);
-    const totalPenalty = maxExcess * (5 / 60);
+    const totalPenalty = roundTwoDecimals(maxExcess * (5 / 60));
 
     const raw1 = s1?.totalScore || 0;
     const raw2 = s2?.totalScore || 0;
@@ -410,7 +416,7 @@ export function AdminDashboard() {
     } else if (s2) {
        avgRaw = raw2;
     }
-    const grandTotal = avgRaw - totalPenalty;
+    const grandTotal = roundTwoDecimals(avgRaw - totalPenalty);
 
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
@@ -422,7 +428,7 @@ export function AdminDashboard() {
     doc.text("Kategori", 14, 23); doc.text(`: ${participant.category}`, 45, 23);
     doc.text("Nomor Peserta", 14, 28); doc.text(`: ${participant.number}`, 45, 28);
     doc.text("Nama Regu", 14, 33); doc.text(`: ${participant.name}`, 45, 33);
-    doc.text("Nilai Akhir", 14, 38); doc.text(`: ${Number.isInteger(grandTotal) ? grandTotal : Number(grandTotal).toFixed(2)}`, 45, 38);
+    doc.text("Nilai Akhir", 14, 38); doc.text(`: ${formatScore(grandTotal)}`, 45, 38);
 
     let currentY = 44;
     
@@ -463,19 +469,19 @@ export function AdminDashboard() {
     });
     tableData.push([
       { content: 'Total Nilai (Sebelum Penalti)', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right', fillColor: [250, 250, 250], cellPadding: 2 } },
-      { content: s1 ? (Number.isInteger(raw1) ? raw1 : Number(raw1).toFixed(2)) : '-', styles: { fontStyle: 'bold', halign: 'center', fillColor: [250, 250, 250], cellPadding: 2 } },
-      { content: s2 ? (Number.isInteger(raw2) ? raw2 : Number(raw2).toFixed(2)) : '-', styles: { fontStyle: 'bold', halign: 'center', fillColor: [250, 250, 250], cellPadding: 2 } }
+      { content: s1 ? formatScore(raw1) : '-', styles: { fontStyle: 'bold', halign: 'center', fillColor: [250, 250, 250], cellPadding: 2 } },
+      { content: s2 ? formatScore(raw2) : '-', styles: { fontStyle: 'bold', halign: 'center', fillColor: [250, 250, 250], cellPadding: 2 } }
     ]);
     
     tableData.push([
       { content: maxExcess > 0 ? `Penalti Waktu (Kelebihan: ${maxExcess} dtk)` : 'Penalti Waktu (Aman/Tepat Waktu)', colSpan: 2, styles: { fontStyle: 'bold', halign: 'right', fillColor: [255, 240, 240], cellPadding: 2 } },
-      { content: totalPenalty > 0 ? `-${totalPenalty.toFixed(2)}` : '-', styles: { fontStyle: 'bold', halign: 'center', textColor: [200,0,0], fillColor: [255, 240, 240], cellPadding: 2 } },
-      { content: totalPenalty > 0 ? `-${totalPenalty.toFixed(2)}` : '-', styles: { fontStyle: 'bold', halign: 'center', textColor: [200,0,0], fillColor: [255, 240, 240], cellPadding: 2 } }
+      { content: totalPenalty > 0 ? `-${formatScore(totalPenalty)}` : '-', styles: { fontStyle: 'bold', halign: 'center', textColor: [200,0,0], fillColor: [255, 240, 240], cellPadding: 2 } },
+      { content: totalPenalty > 0 ? `-${formatScore(totalPenalty)}` : '-', styles: { fontStyle: 'bold', halign: 'center', textColor: [200,0,0], fillColor: [255, 240, 240], cellPadding: 2 } }
     ]);
     
     tableData.push([
       { content: 'NILAI AKHIR GABUNGAN', colSpan: 3, styles: { fontStyle: 'bold', halign: 'right', fillColor: [220, 240, 220], cellPadding: 3, fontSize: 11 } },
-      { content: Number.isInteger(grandTotal) ? grandTotal : Number(grandTotal).toFixed(2), styles: { fontStyle: 'bold', halign: 'center', fillColor: [220, 240, 220], cellPadding: 3, fontSize: 11 } }
+      { content: formatScore(grandTotal), styles: { fontStyle: 'bold', halign: 'center', fillColor: [220, 240, 220], cellPadding: 3, fontSize: 11 } }
     ]);
 
     autoTable(doc, {
@@ -521,7 +527,7 @@ export function AdminDashboard() {
         
         doc.text(timeStr, 14, footerY);
         
-        const pageStr = `Hal. ${data.pageNumber} dari ${doc.internal.getNumberOfPages()}`;
+        const pageStr = `Hal. ${data.pageNumber} dari ${(doc as any).internal.getNumberOfPages()}`;
         doc.text(pageStr, pageWidth / 2, footerY, { align: 'center' });
         
         const pInfo = `${participant.number} ${participant.name}`;
@@ -855,6 +861,12 @@ export function AdminDashboard() {
     }
   };
 
+  const generateExportFilename = (name: string, ext: string) => {
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${name} ${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())} ${pad(now.getHours())}.${pad(now.getMinutes())}.${pad(now.getSeconds())}.${ext}`;
+  };
+
   const exportUsersXlsx = async () => {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Daftar Pengguna');
@@ -886,7 +898,7 @@ export function AdminDashboard() {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `Data_Pengguna_${new Date().toISOString().split('T')[0]}.xlsx`;
+    a.download = generateExportFilename("Data Pengguna LKBB dan Yel-Yel", "xlsx");
     a.click();
     window.URL.revokeObjectURL(url);
   };
@@ -1146,11 +1158,11 @@ export function AdminDashboard() {
           }
         });
 
-        juri1Total = s1?.totalScore || 0;
-        juri2Total = s2?.totalScore || 0;
+        juri1Total = roundTwoDecimals(s1?.totalScore || 0);
+        juri2Total = roundTwoDecimals(s2?.totalScore || 0);
 
-        const raw1 = s1?.totalScore || 0;
-        const raw2 = s2?.totalScore || 0;
+        const raw1 = juri1Total;
+        const raw2 = juri2Total;
 
         let validTimer = 0;
         const usedScores = [s1, s2].filter(Boolean);
@@ -1158,7 +1170,7 @@ export function AdminDashboard() {
         if (timers.length > 0) validTimer = Math.min(...timers);
         
         excess = Math.max(0, validTimer - 300);
-        totalPenalty = excess * (5 / 60);
+        totalPenalty = roundTwoDecimals(excess * (5 / 60));
 
         let avgRaw = 0;
         if (s1 && s2) {
@@ -1169,7 +1181,7 @@ export function AdminDashboard() {
            avgRaw = raw2;
         }
         
-        grandTotal = avgRaw - totalPenalty;
+        grandTotal = roundTwoDecimals(avgRaw - totalPenalty);
       }
       
       return { 
@@ -1219,13 +1231,7 @@ export function AdminDashboard() {
   });
 
   
-  const generateExportFilename = (name: string, ext: string) => {
-    const now = new Date();
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return `${name} ${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())} ${pad(now.getHours())}.${pad(now.getMinutes())}.${pad(now.getSeconds())}.${ext}`;
-  };
-
-    const exportDaftarPesertaExcel = async () => {
+  const exportDaftarPesertaExcel = async () => {
     try {
       const workbook = new ExcelJS.Workbook();
       
@@ -1366,7 +1372,7 @@ export function AdminDashboard() {
           styles: { fontSize: 8.5, cellPadding: 1.5, lineColor: [200, 200, 200] },
           margin: { left: 14, right: 14 },
           didParseCell: (data) => {
-            if (data.section === 'body' && data.row.raw.length === 3) {
+            if (data.section === 'body' && Array.isArray(data.row.raw) && data.row.raw.length === 3) {
               if (data.column.index === 0) {
                 data.cell.styles.lineWidth = { top: 0.1, right: 0, bottom: 0.1, left: 0.1 };
               } else if (data.column.index === 1) {
@@ -1390,7 +1396,7 @@ export function AdminDashboard() {
             
             doc.text("Format Penilaian LKBB & Yel-Yel", 14, footerY);
             
-            const pageStr = `Hal. ${data.pageNumber} dari ${doc.internal.getNumberOfPages()}`;
+            const pageStr = `Hal. ${data.pageNumber} dari ${(doc as any).internal.getNumberOfPages()}`;
             doc.text(pageStr, pageWidth / 2, footerY, { align: 'center' });
             
             const pInfo = `${p.number} ${p.category}`;
@@ -1608,7 +1614,7 @@ export function AdminDashboard() {
             top3.forEach((p, idx) => {
               const r = parseInt(p.rank.toString());
               const rankStr = r === 1 ? 'I' : r === 2 ? 'II' : r === 3 ? 'III' : p.rank;
-              const nilaiStr = Number.isInteger(p.grandTotal) ? p.grandTotal : p.grandTotal.toFixed(2);
+              const nilaiStr = formatScore(p.grandTotal);
               
               if (idx === 0) {
                 juaraData.push([
@@ -1693,10 +1699,10 @@ export function AdminDashboard() {
             index + 1,
             p.number,
             p.name,
-            Number.isInteger(p.juri1Total) ? p.juri1Total : p.juri1Total.toFixed(2),
-            Number.isInteger(p.juri2Total) ? p.juri2Total : p.juri2Total.toFixed(2),
-            p.totalPenalty > 0 ? `-${p.totalPenalty.toFixed(2)}` : '-',
-            Number.isInteger(p.grandTotal) ? p.grandTotal : p.grandTotal.toFixed(2),
+            p.juri1Total > 0 ? formatScore(p.juri1Total) : '-',
+            p.juri2Total > 0 ? formatScore(p.juri2Total) : '-',
+            p.totalPenalty > 0 ? `-${formatScore(p.totalPenalty)}` : '-',
+            p.grandTotal > 0 ? formatScore(p.grandTotal) : '-',
             p.isDisqualified ? 'Diskualifikasi' : (p.rank !== '-' ? p.rank : '-')
           ]);
         });
@@ -1790,10 +1796,10 @@ export function AdminDashboard() {
             rank: p.rank !== '-' ? p.rank : '-',
             number: p.number,
             name: p.name,
-            juri1: p.juri1Total,
-            juri2: p.juri2Total,
-            penalty: p.totalPenalty > 0 ? -p.totalPenalty : 0,
-            final: p.grandTotal,
+            juri1: p.juri1Total > 0 ? roundTwoDecimals(p.juri1Total) : '-',
+            juri2: p.juri2Total > 0 ? roundTwoDecimals(p.juri2Total) : '-',
+            penalty: p.totalPenalty > 0 ? -roundTwoDecimals(p.totalPenalty) : 0,
+            final: p.grandTotal > 0 ? roundTwoDecimals(p.grandTotal) : 0,
             status: p.isDisqualified ? p.disqualificationReason || 'Diskualifikasi' : (p.rank !== '-' ? `Juara ${p.rank}` : '-')
           });
         });
@@ -1857,10 +1863,10 @@ export function AdminDashboard() {
           worksheet.addRow({
             number: p.number,
             name: p.name,
-            juri1: p.juri1Total > 0 ? p.juri1Total.toFixed(2) : '-',
-            juri2: p.juri2Total > 0 ? p.juri2Total.toFixed(2) : '-',
-            penalty: p.totalPenalty > 0 ? `-${p.totalPenalty}` : '-',
-            final: p.grandTotal > 0 ? p.grandTotal.toFixed(2) : '-',
+            juri1: p.juri1Total > 0 ? formatScore(p.juri1Total) : '-',
+            juri2: p.juri2Total > 0 ? formatScore(p.juri2Total) : '-',
+            penalty: p.totalPenalty > 0 ? `-${formatScore(p.totalPenalty)}` : '-',
+            final: p.grandTotal > 0 ? formatScore(p.grandTotal) : '-',
             disqualified: p.isDisqualified ? 'Ya - ' + p.disqualificationReason : '-'
           });
         });
@@ -2290,16 +2296,18 @@ export function AdminDashboard() {
                       <RotateCcw className="w-4 h-4 mr-2" />
                       Pulihkan Status
                     </Button>
-                    <Button 
-                      size="sm" 
-                      variant="destructive"
-                      className="flex-1 sm:flex-none"
-                      onClick={handleBulkResetScores}
-                      disabled={isBulkProcessingScores}
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Reset Nilai
-                    </Button>
+                    {isSuperAdmin && (
+                      <Button 
+                        size="sm" 
+                        variant="destructive"
+                        className="flex-1 sm:flex-none"
+                        onClick={handleBulkResetScores}
+                        disabled={isBulkProcessingScores}
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Reset Nilai
+                      </Button>
+                    )}
                   </div>
                 </div>
               )}
@@ -2308,7 +2316,7 @@ export function AdminDashboard() {
                   <thead className="bg-slate-50 text-slate-600 uppercase text-[10px] sm:text-xs sticky top-0 z-10 shadow-sm">
                     <tr>
                       <th className="px-2 py-2 font-medium rounded-tl-md text-center w-8">
-                        {isSuperAdmin && (
+                        {canManageParticipants && (
                               <input 
                                 type="checkbox"
                           className="rounded border-slate-300 text-blue-600 focus:ring-blue-600 cursor-pointer"
@@ -2346,7 +2354,7 @@ export function AdminDashboard() {
                         {group.participants.map((p, index) => (
                           <tr key={p.id} className="hover:bg-slate-50 transition-colors">
                             <td className="px-2 py-1.5 text-center">
-                              {isSuperAdmin && (
+                              {canManageParticipants && (
                               <input 
                                 type="checkbox"
                                 className="rounded border-slate-300 text-blue-600 focus:ring-blue-600 cursor-pointer"
@@ -2423,14 +2431,14 @@ export function AdminDashboard() {
                             <td className="px-2 py-1.5 text-center">
                               {p.juri1Total > 0 ? (
                                 <Badge className="bg-green-100 text-green-800 hover:bg-green-100 border-green-200 px-1.5 py-0">
-                                  {Number(p.juri1Total).toFixed(2)} pt
+                                  {formatScore(p.juri1Total)} pt
                                 </Badge>
                               ) : <span className="text-slate-300">-</span>}
                             </td>
                             <td className="px-2 py-1.5 text-center">
                               {p.juri2Total > 0 ? (
                                 <Badge className="bg-green-100 text-green-800 hover:bg-green-100 border-green-200 px-1.5 py-0">
-                                  {Number(p.juri2Total).toFixed(2)} pt
+                                  {formatScore(p.juri2Total)} pt
                                 </Badge>
                               ) : <span className="text-slate-300">-</span>}
                             </td>
@@ -2438,10 +2446,10 @@ export function AdminDashboard() {
                               {p.totalPenalty > 0 ? (
                                 <div className="flex flex-col items-center group relative">
                                   <Badge className="bg-red-100 text-red-800 hover:bg-red-100 border-red-200 px-1.5 py-0 cursor-help">
-                                    -{Number(p.totalPenalty).toFixed(2)} pt
+                                    -{formatScore(p.totalPenalty)} pt
                                   </Badge>
                                   <span className="absolute bottom-full mb-1 hidden group-hover:block w-max max-w-[200px] text-center bg-slate-800 text-white text-[10px] px-2 py-1 rounded shadow-sm z-10">
-                                    Potongan -{Number(p.totalPenalty).toFixed(2)} pt<br/>(Lebih {p.excessSeconds} dtk)<br/><span className="text-[8px] text-slate-300">Berdasarkan waktu terkecil Juri</span>
+                                    Potongan -{formatScore(p.totalPenalty)} pt<br/>(Lebih {p.excessSeconds} dtk)<br/><span className="text-[8px] text-slate-300">Berdasarkan waktu terkecil Juri</span>
                                   </span>
                                 </div>
                               ) : p.juri1Total > 0 || p.juri2Total > 0 ? (
@@ -2451,7 +2459,7 @@ export function AdminDashboard() {
                               ) : <span className="text-slate-300">-</span>}
                             </td>
                             <td className="px-2 py-1.5 text-center font-bold text-slate-900 text-base">
-                              {p.isDisqualified ? <span className="text-red-500 text-sm">0</span> : Number.isInteger(p.grandTotal) ? p.grandTotal : Number(p.grandTotal).toFixed(2)}
+                              {p.isDisqualified ? <span className="text-red-500 text-sm">0</span> : formatScore(p.grandTotal)}
                             </td>
                             <td className="px-2 py-1.5 text-center">
                               {p.isDisqualified ? (
@@ -2549,7 +2557,7 @@ export function AdminDashboard() {
                               </div>
                             </div>
                             <div className="inline-block bg-slate-50 border rounded-lg px-2 py-1.5 sm:px-3 sm:py-1.5 flex-shrink-0">
-                              <span className="text-lg sm:text-xl font-black text-slate-800">{p.grandTotal}</span>
+                              <span className="text-lg sm:text-xl font-black text-slate-800">{formatScore(p.grandTotal)}</span>
                               <span className="text-[10px] sm:text-xs font-medium text-slate-500 ml-1">pts</span>
                             </div>
                           </CardContent>
@@ -2572,7 +2580,7 @@ export function AdminDashboard() {
                                           <div className="text-xs text-slate-500">No. {p.number}</div>
                                         </td>
                                         <td className="px-4 py-2 text-right font-bold text-slate-900 text-base">
-                                          {p.grandTotal} pt
+                                          {formatScore(p.grandTotal)} pt
                                         </td>
                                       </tr>
                                     ))}
@@ -3619,7 +3627,7 @@ export function AdminDashboard() {
                         {pScore.isDisqualified ? (
                           <Badge variant="destructive" className="px-2 py-0 text-[10px] sm:text-xs">Diskualifikasi</Badge>
                         ) : (
-                          <span className="font-bold text-blue-700 text-xs sm:text-sm">Total: {Number.isInteger(pScore.totalScore) ? pScore.totalScore : Number(pScore.totalScore).toFixed(2)}</span>
+                          <span className="font-bold text-blue-700 text-xs sm:text-sm">Total: {formatScore(pScore.totalScore)}</span>
                         )}
                       </div>
                       {!pScore.isDisqualified && (

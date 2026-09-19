@@ -250,7 +250,7 @@ export default function AuditEvaluasi({ participants, scores, appUsers }: AuditE
       itemDiscriminations.push({
         id: crit.id,
         name: crit.name,
-        correlation: isNaN(correlation) ? 0 : Number(correlation.toFixed(3)),
+        correlation: isNaN(correlation) ? 0 : Number(correlation.toFixed(2)),
         stdDev: Number(stdDev.toFixed(2))
       });
     });
@@ -339,7 +339,7 @@ export default function AuditEvaluasi({ participants, scores, appUsers }: AuditE
     // Sheet 1: Instrumen
     if (instrumentAnalysis) {
       const instData = [
-        { Metrik: "Cronbach's Alpha", Nilai: instrumentAnalysis.cronbachAlpha.toFixed(3), Status: instrumentAnalysis.reliabilityJudgement },
+        { Metrik: "Cronbach's Alpha", Nilai: instrumentAnalysis.cronbachAlpha.toFixed(2), Status: instrumentAnalysis.reliabilityJudgement },
         { Metrik: "Kriteria Paling Sulit", Nilai: instrumentAnalysis.hardestItem.name, Status: `Rata-rata Skor: ${instrumentAnalysis.hardestItem.mean.toFixed(2)}` },
         { Metrik: "Kriteria Paling Mudah", Nilai: instrumentAnalysis.easiestItem.name, Status: `Rata-rata Skor: ${instrumentAnalysis.easiestItem.mean.toFixed(2)}` }
       ];
@@ -353,7 +353,7 @@ export default function AuditEvaluasi({ participants, scores, appUsers }: AuditE
       "Jumlah Penilaian": j.evalCount,
       "Bias (Mean Deviasi)": j.avgBias.toFixed(2),
       "Kecenderungan": j.biasJudgement,
-      "Korelasi Ranking (Spearman)": j.spearman.toFixed(3),
+      "Korelasi Ranking (Spearman)": j.spearman.toFixed(2),
       "Konsistensi dengan Panel": j.syncJudgement,
       "Indikasi Favoritisme": j.isFavoritism ? "Terdeteksi (Anomali Nilai Tinggi)" : "Tidak Ditemukan"
     }));
@@ -363,11 +363,11 @@ export default function AuditEvaluasi({ participants, scores, appUsers }: AuditE
     // Sheet 3: Integritas Sistemik Lanjutan
     if (systemicAnalysis) {
       const sysData = [
-        { Parameter: "Kesepahaman Antar-Juri (Inter-Rater Agreement)", Nilai: systemicAnalysis.raterAgreement.coefficient, Keterangan: systemicAnalysis.raterAgreement.judgement },
-        { Parameter: "Uji Stabilitas Urutan Tampil (Fatigue Effect)", Nilai: systemicAnalysis.orderStability.r, Keterangan: systemicAnalysis.orderStability.judgement },
-        { Parameter: "Kriteria Penentu Kemenangan (Top Discriminator)", Nilai: systemicAnalysis.topDiscriminator.name, Keterangan: `Korelasi dengan Total Nilai: r = ${systemicAnalysis.topDiscriminator.correlation}` },
+        { Parameter: "Kesepahaman Antar-Juri (Inter-Rater Agreement)", Nilai: systemicAnalysis.raterAgreement.coefficient.toFixed(2), Keterangan: systemicAnalysis.raterAgreement.judgement },
+        { Parameter: "Uji Stabilitas Urutan Tampil (Fatigue Effect)", Nilai: systemicAnalysis.orderStability.r.toFixed(2), Keterangan: systemicAnalysis.orderStability.judgement },
+        { Parameter: "Kriteria Penentu Kemenangan (Top Discriminator)", Nilai: systemicAnalysis.topDiscriminator.name, Keterangan: `Korelasi dengan Total Nilai: r = ${systemicAnalysis.topDiscriminator.correlation.toFixed(2)}` },
         { Parameter: "Uji Ketahanan Ranking Juara (Z-Score Robustness)", Nilai: `${systemicAnalysis.robustnessPct}%`, Keterangan: systemicAnalysis.isRobust ? "100% Kebal Bias (Podium Stabil)" : "Sensitif Moderat" },
-        { Parameter: "Kerapatan Persaingan (Margin Juara 1 vs 2)", Nilai: `${systemicAnalysis.margin1_2} poin`, Keterangan: systemicAnalysis.marginJudgement }
+        { Parameter: "Kerapatan Persaingan (Margin Juara 1 vs 2)", Nilai: `${systemicAnalysis.margin1_2.toFixed(2)} poin`, Keterangan: systemicAnalysis.marginJudgement }
       ];
       const wsSys = xlsx.utils.json_to_sheet(sysData);
       xlsx.utils.book_append_sheet(wb, wsSys, "Integritas Sistemik");
@@ -426,7 +426,7 @@ export default function AuditEvaluasi({ participants, scores, appUsers }: AuditE
         body: [
           [
             "Reliabilitas Konsistensi Internal (Cronbach's Alpha)",
-            instrumentAnalysis.cronbachAlpha.toFixed(3),
+            instrumentAnalysis.cronbachAlpha.toFixed(2),
             instrumentAnalysis.reliabilityJudgement
           ],
           [
@@ -535,18 +535,18 @@ export default function AuditEvaluasi({ participants, scores, appUsers }: AuditE
         body: [
           [
             "Kesepahaman Antar-Juri (Inter-Rater Reliability)",
-            systemicAnalysis.raterAgreement.coefficient.toFixed(3),
+            systemicAnalysis.raterAgreement.coefficient.toFixed(2),
             systemicAnalysis.raterAgreement.judgement
           ],
           [
             "Stabilitas Urutan Tampil (Fatigue & Order Effect)",
-            `r = ${systemicAnalysis.orderStability.r > 0 ? '+' : ''}${systemicAnalysis.orderStability.r.toFixed(3)}`,
+            `r = ${systemicAnalysis.orderStability.r > 0 ? '+' : ''}${systemicAnalysis.orderStability.r.toFixed(2)}`,
             systemicAnalysis.orderStability.judgement
           ],
           [
             "Kriteria Penentu Kemenangan (Top Discriminator)",
             systemicAnalysis.topDiscriminator.name,
-            `Diferensiasi Terbesar (Korelasi Skor: r = ${systemicAnalysis.topDiscriminator.correlation})`
+            `Diferensiasi Terbesar (Korelasi Skor: r = ${systemicAnalysis.topDiscriminator.correlation.toFixed(2)})`
           ],
           [
             "Ketahanan Ranking Juara (Z-Score Robustness)",
@@ -555,7 +555,7 @@ export default function AuditEvaluasi({ participants, scores, appUsers }: AuditE
           ],
           [
             "Kerapatan Persaingan (Competitive Gap)",
-            `Selisih: ${systemicAnalysis.margin1_2} pt`,
+            `Selisih: ${systemicAnalysis.margin1_2.toFixed(2)} pt`,
             `${systemicAnalysis.marginJudgement} (Juara 1 vs Juara 2)`
           ]
         ],
@@ -744,7 +744,7 @@ export default function AuditEvaluasi({ participants, scores, appUsers }: AuditE
             <div>
               <p className="text-sm font-medium text-slate-500 mb-1">Reliabilitas Cronbach's Alpha</p>
               <div className="flex items-end gap-3">
-                <h3 className="text-3xl font-bold text-slate-800">{instrumentAnalysis.cronbachAlpha.toFixed(3)}</h3>
+                <h3 className="text-3xl font-bold text-slate-800">{instrumentAnalysis.cronbachAlpha.toFixed(2)}</h3>
                 <span className={`text-sm font-semibold ${instrumentAnalysis.reliabilityColor} mb-1.5`}>
                   {instrumentAnalysis.reliabilityJudgement}
                 </span>
@@ -848,7 +848,7 @@ export default function AuditEvaluasi({ participants, scores, appUsers }: AuditE
                 </div>
                 <div className="flex items-baseline gap-2">
                   <h4 className="text-2xl font-bold text-slate-800 font-mono">
-                    {systemicAnalysis.raterAgreement.coefficient.toFixed(3)}
+                    {systemicAnalysis.raterAgreement.coefficient.toFixed(2)}
                   </h4>
                   <span className={`text-xs font-semibold ${systemicAnalysis.raterAgreement.badgeColor}`}>
                     {systemicAnalysis.raterAgreement.judgement}
@@ -869,7 +869,7 @@ export default function AuditEvaluasi({ participants, scores, appUsers }: AuditE
                 </div>
                 <div className="flex items-baseline gap-2">
                   <h4 className="text-2xl font-bold text-slate-800 font-mono">
-                    r = {systemicAnalysis.orderStability.r > 0 ? '+' : ''}{systemicAnalysis.orderStability.r.toFixed(3)}
+                    r = {systemicAnalysis.orderStability.r > 0 ? '+' : ''}{systemicAnalysis.orderStability.r.toFixed(2)}
                   </h4>
                   <span className={`text-xs font-semibold ${systemicAnalysis.orderStability.isStable ? 'text-emerald-600' : 'text-amber-600'}`}>
                     {systemicAnalysis.orderStability.isStable ? 'Netral & Adil' : 'Ada Fluktuasi'}
@@ -893,7 +893,7 @@ export default function AuditEvaluasi({ participants, scores, appUsers }: AuditE
                     {systemicAnalysis.topDiscriminator.name}
                   </h4>
                   <p className="text-xs text-amber-700 font-medium mt-0.5">
-                    Korelasi Skor: r = {systemicAnalysis.topDiscriminator.correlation}
+                    Korelasi Skor: r = {systemicAnalysis.topDiscriminator.correlation.toFixed(2)}
                   </p>
                 </div>
                 <p className="text-[11px] text-slate-500 leading-tight">
@@ -918,7 +918,7 @@ export default function AuditEvaluasi({ participants, scores, appUsers }: AuditE
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-500 leading-tight">
-                  Margin Juara 1 vs 2: <strong>{systemicAnalysis.margin1_2} pt</strong> ({systemicAnalysis.marginJudgement}).
+                  Margin Juara 1 vs 2: <strong>{systemicAnalysis.margin1_2.toFixed(2)} pt</strong> ({systemicAnalysis.marginJudgement}).
                 </p>
               </div>
             </div>
@@ -946,7 +946,7 @@ export default function AuditEvaluasi({ participants, scores, appUsers }: AuditE
                 Pernyataan Penjaminan Mutu & Keadilan Hasil Lomba (Quality Assurance)
               </div>
               <p className="text-xs leading-relaxed text-emerald-900">
-                Berdasarkan uji psikometri dan audit reliabilitas panel juri: Seluruh instrumen lomba terbukti andal (Cronbach's Alpha <strong>{instrumentAnalysis.cronbachAlpha.toFixed(3)}</strong>), tingkat kesepahaman antar-juri berstatus <strong>{systemicAnalysis.raterAgreement.judgement}</strong>, dan penilaian bebas dari bias nomor undian maupun efek kelelahan juri. Komposisi 3 besar podium terbukti <strong>{systemicAnalysis.robustnessPct}% kebal bias juri</strong>, dengan mata lomba "<strong>{systemicAnalysis.topDiscriminator.name}</strong>" sebagai penentu keunggulan utama.
+                Berdasarkan uji psikometri dan audit reliabilitas panel juri: Seluruh instrumen lomba terbukti andal (Cronbach's Alpha <strong>{instrumentAnalysis.cronbachAlpha.toFixed(2)}</strong>), tingkat kesepahaman antar-juri berstatus <strong>{systemicAnalysis.raterAgreement.judgement}</strong>, dan penilaian bebas dari bias nomor undian maupun efek kelelahan juri. Komposisi 3 besar podium terbukti <strong>{systemicAnalysis.robustnessPct}% kebal bias juri</strong>, dengan mata lomba "<strong>{systemicAnalysis.topDiscriminator.name}</strong>" sebagai penentu keunggulan utama.
               </p>
             </div>
           )}

@@ -85,7 +85,7 @@ export function calculateInterRaterAgreement(j1Scores: number[], j2Scores: numbe
   }
 
   return {
-    coefficient: Number(clampedR.toFixed(3)),
+    coefficient: Number(clampedR.toFixed(2)),
     judgement,
     badgeColor
   };
@@ -126,7 +126,7 @@ export function calculateOrderEffectStability(orders: number[], totalScores: num
   }
 
   return {
-    r: Number(r.toFixed(3)),
+    r: Number(r.toFixed(2)),
     judgement,
     isStable
   };

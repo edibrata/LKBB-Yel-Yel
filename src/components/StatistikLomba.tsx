@@ -2,6 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Badge } from './ui/badge';
 import { CATEGORIES } from '../lib/constants';
+import { formatScore, roundTwoDecimals } from '../lib/utils';
 import { 
   Users, 
   CheckCircle2, 
@@ -168,8 +169,8 @@ export default function StatistikLomba({ participants, scores, appUsers }: Stati
         partial,
         unscored,
         pct,
-        avgScore: Number(avgScore.toFixed(1)),
-        maxScore: Number(maxScore.toFixed(1)),
+        avgScore: roundTwoDecimals(avgScore),
+        maxScore: roundTwoDecimals(maxScore),
         topTeam
       };
     });
@@ -382,7 +383,7 @@ export default function StatistikLomba({ participants, scores, appUsers }: Stati
                 <div className="pt-2 border-t border-slate-100 text-[11px] text-slate-600 flex justify-between items-center">
                   <span className="text-slate-400">Tertinggi:</span>
                   <span className="font-semibold text-slate-800 truncate max-w-[120px]" title={stat.topTeam}>
-                    {stat.topTeam} {stat.maxScore > 0 ? `(${stat.maxScore})` : ''}
+                    {stat.topTeam} {stat.maxScore > 0 ? `(${formatScore(stat.maxScore)})` : ''}
                   </span>
                 </div>
               </CardContent>
@@ -513,7 +514,7 @@ export default function StatistikLomba({ participants, scores, appUsers }: Stati
                         {p.isDisqualified ? (
                           <span className="text-red-500 text-xs">Diskualifikasi</span>
                         ) : p.totalScore > 0 ? (
-                          Number.isInteger(p.totalScore) ? p.totalScore : p.totalScore.toFixed(2)
+                          formatScore(p.totalScore)
                         ) : (
                           <span className="text-slate-300 font-normal">-</span>
                         )}

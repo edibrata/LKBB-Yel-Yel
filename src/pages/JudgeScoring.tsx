@@ -8,6 +8,7 @@ import { SCORING_CRITERIA, FLAT_CRITERIA } from '../lib/constants';
 import { ArrowLeft, Save, AlertCircle, ChevronDown, ChevronUp, Check, Play } from 'lucide-react';
 import { Badge } from '../components/ui/badge';
 import { BiasGuidelineModal } from '../components/BiasGuidelineModal';
+import { formatScore, roundTwoDecimals } from '../lib/utils';
 
 export function JudgeScoring() {
   const { user } = useAuth();
@@ -238,12 +239,13 @@ export function JudgeScoring() {
       
       // Calculate penalty
       let timePenalty = 0;
-              let excessSeconds = 0;
-              if (timerSeconds > 300) {
-                excessSeconds = timerSeconds - 300;
-                timePenalty = excessSeconds * (5 / 60);
-              }
-      const finalScore = totalScore - timePenalty;
+      let excessSeconds = 0;
+      if (timerSeconds > 300) {
+        excessSeconds = timerSeconds - 300;
+        timePenalty = roundTwoDecimals(excessSeconds * (5 / 60));
+      }
+      totalScore = roundTwoDecimals(totalScore);
+      const finalScore = roundTwoDecimals(totalScore - timePenalty);
 
       
       setDoc(doc(db, 'scores', docId), {
@@ -504,16 +506,16 @@ export function JudgeScoring() {
               let excessSeconds = 0;
               if (timerSeconds > 300) {
                 excessSeconds = timerSeconds - 300;
-                timePenalty = excessSeconds * (5 / 60);
+                timePenalty = roundTwoDecimals(excessSeconds * (5 / 60));
               }
-              const displayFinalScore = displayTotal - timePenalty;
+              const displayFinalScore = roundTwoDecimals(displayTotal - timePenalty);
               
               return (
                 <div className="flex flex-col">
                   <div className="text-slate-600 font-medium">
-                    Total: <span className="text-2xl text-slate-900 font-bold ml-1">{displayFinalScore.toFixed(2)}</span>
+                    Total: <span className="text-2xl text-slate-900 font-bold ml-1">{formatScore(displayFinalScore)}</span>
                   </div>
-                  {timePenalty > 0 && <div className="text-red-500 text-xs font-bold">- {timePenalty.toFixed(2)} pt (Lebih {excessSeconds} dtk)</div>}
+                  {timePenalty > 0 && <div className="text-red-500 text-xs font-bold">- {formatScore(timePenalty)} pt (Lebih {excessSeconds} dtk)</div>}
                 </div>
               );
             })()}
