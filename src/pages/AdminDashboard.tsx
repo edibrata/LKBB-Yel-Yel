@@ -1184,6 +1184,8 @@ export function AdminDashboard() {
         grandTotal = roundTwoDecimals(avgRaw - totalPenalty);
       }
       
+      const averageScore = grandTotal > 0 ? roundTwoDecimals(grandTotal / 2) : 0;
+
       return { 
         ...p, 
         juri1Total, 
@@ -1191,6 +1193,7 @@ export function AdminDashboard() {
         totalPenalty,
         excessSeconds: excess,
         grandTotal,
+        averageScore,
         isDisqualified,
         disqualificationReason
       };
@@ -1656,21 +1659,24 @@ export function AdminDashboard() {
             top3.forEach((p, idx) => {
               const r = parseInt(p.rank.toString());
               const rankStr = r === 1 ? 'I' : r === 2 ? 'II' : r === 3 ? 'III' : p.rank;
-              const nilaiStr = formatScore(p.grandTotal);
+              const jumlahStr = formatScore(p.grandTotal);
+              const rataRataStr = p.averageScore > 0 ? formatScore(p.averageScore) : formatScore(roundTwoDecimals(p.grandTotal / 2));
               
               if (idx === 0) {
                 juaraData.push([
                   { content: catCounter, rowSpan: top3.length, styles: { halign: 'center', valign: 'middle' } },
                   { content: category, rowSpan: top3.length, styles: { valign: 'middle' } },
                   rankStr,
-                  nilaiStr,
+                  jumlahStr,
+                  rataRataStr,
                   p.number,
                   p.name
                 ]);
               } else {
                 juaraData.push([
                   rankStr,
-                  nilaiStr,
+                  jumlahStr,
+                  rataRataStr,
                   p.number,
                   p.name
                 ]);
@@ -1683,18 +1689,19 @@ export function AdminDashboard() {
 
       autoTable(doc, {
         startY: 50,
-        head: [['No.', 'Kategori', 'Juara', 'Nilai', 'Nomor\nPeserta', 'Pangkalan / Regu']],
+        head: [['No.', 'Kategori', 'Juara', 'Jumlah', 'Rata-rata', 'Nomor\nPeserta', 'Pangkalan / Regu']],
         body: juaraData,
         theme: 'grid',
         styles: { font: 'times', fontSize: 9.5, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.3, cellPadding: 1.5 },
         headStyles: { fillColor: [255, 255, 255], fontStyle: 'bold', halign: 'center', valign: 'middle' },
         columnStyles: {
           0: { cellWidth: 10, halign: 'center' },
-          1: { cellWidth: 40 },
-          2: { cellWidth: 15, halign: 'center', valign: 'middle' },
-          3: { cellWidth: 15, halign: 'center', valign: 'middle' },
-          4: { cellWidth: 20, halign: 'center', valign: 'middle' },
-          5: { cellWidth: 'auto', valign: 'middle' }
+          1: { cellWidth: 35 },
+          2: { cellWidth: 14, halign: 'center', valign: 'middle' },
+          3: { cellWidth: 18, halign: 'center', valign: 'middle' },
+          4: { cellWidth: 18, halign: 'center', valign: 'middle' },
+          5: { cellWidth: 18, halign: 'center', valign: 'middle' },
+          6: { cellWidth: 'auto', valign: 'middle' }
         },
         margin: { left: 15, right: 15 }
       });
@@ -1745,6 +1752,7 @@ export function AdminDashboard() {
             p.juri2Total > 0 ? formatScore(p.juri2Total) : '-',
             p.totalPenalty > 0 ? `-${formatScore(p.totalPenalty)}` : '-',
             p.grandTotal > 0 ? formatScore(p.grandTotal) : '-',
+            p.isDisqualified ? '0' : (p.averageScore > 0 ? formatScore(p.averageScore) : '-'),
             p.isDisqualified ? 'Diskualifikasi' : (p.rank !== '-' ? p.rank : '-')
           ]);
         });
@@ -1754,7 +1762,7 @@ export function AdminDashboard() {
           head: [[
             { content: 'Nomor', colSpan: 2, styles: { halign: 'center' } },
             { content: 'Pangkalan / Regu', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } },
-            { content: 'Nilai', colSpan: 4, styles: { halign: 'center' } },
+            { content: 'Nilai', colSpan: 5, styles: { halign: 'center' } },
             { content: 'Rank', rowSpan: 2, styles: { halign: 'center', valign: 'middle' } }
           ], [
             { content: 'Urut', styles: { halign: 'center' } },
@@ -1762,21 +1770,23 @@ export function AdminDashboard() {
             { content: 'Juri 1', styles: { halign: 'center' } },
             { content: 'Juri 2', styles: { halign: 'center' } },
             { content: 'Penalti', styles: { halign: 'center' } },
-            { content: 'Jumlah', styles: { halign: 'center' } }
+            { content: 'Jumlah', styles: { halign: 'center' } },
+            { content: 'Rata-rata', styles: { halign: 'center' } }
           ]],
           body: tableData,
           theme: 'grid',
-          styles: { font: 'times', fontSize: 9, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.3, cellPadding: 1 },
+          styles: { font: 'times', fontSize: 8.5, textColor: [0, 0, 0], lineColor: [0, 0, 0], lineWidth: 0.3, cellPadding: 1 },
           headStyles: { fillColor: [255, 255, 255], fontStyle: 'bold', halign: 'center' },
           columnStyles: {
-            0: { cellWidth: 12, halign: 'center' },
-            1: { cellWidth: 15, halign: 'center' },
+            0: { cellWidth: 10, halign: 'center' },
+            1: { cellWidth: 14, halign: 'center' },
             2: { cellWidth: 'auto' },
-            3: { cellWidth: 16, halign: 'center' },
-            4: { cellWidth: 16, halign: 'center' },
-            5: { cellWidth: 16, halign: 'center' },
-            6: { cellWidth: 16, halign: 'center' },
-            7: { cellWidth: 12, halign: 'center' }
+            3: { cellWidth: 14, halign: 'center' },
+            4: { cellWidth: 14, halign: 'center' },
+            5: { cellWidth: 14, halign: 'center' },
+            6: { cellWidth: 15, halign: 'center' },
+            7: { cellWidth: 15, halign: 'center' },
+            8: { cellWidth: 11, halign: 'center' }
           },
           margin: { left: 15, right: 15 }
         });
@@ -1826,6 +1836,7 @@ export function AdminDashboard() {
           { header: 'Juri 2', key: 'juri2', width: 12 },
           { header: 'Penalti', key: 'penalty', width: 12 },
           { header: 'Nilai Akhir', key: 'final', width: 15 },
+          { header: 'Rata-rata', key: 'average', width: 15 },
           { header: 'Keterangan', key: 'status', width: 25 },
         ];
         
@@ -1842,6 +1853,7 @@ export function AdminDashboard() {
             juri2: p.juri2Total > 0 ? roundTwoDecimals(p.juri2Total) : '-',
             penalty: p.totalPenalty > 0 ? -roundTwoDecimals(p.totalPenalty) : 0,
             final: p.grandTotal > 0 ? roundTwoDecimals(p.grandTotal) : 0,
+            average: p.isDisqualified ? 0 : (p.averageScore > 0 ? roundTwoDecimals(p.averageScore) : 0),
             status: p.isDisqualified ? p.disqualificationReason || 'Diskualifikasi' : (p.rank !== '-' ? `Juara ${p.rank}` : '-')
           });
         });
@@ -1897,6 +1909,7 @@ export function AdminDashboard() {
           { header: 'Juri 2', key: 'juri2', width: 15 },
           { header: 'Total Penalti', key: 'penalty', width: 15 },
           { header: 'Nilai Akhir', key: 'final', width: 15 },
+          { header: 'Rata-rata', key: 'average', width: 15 },
           { header: 'Status Diskualifikasi', key: 'disqualified', width: 30 }
         ];
 
@@ -1909,6 +1922,7 @@ export function AdminDashboard() {
             juri2: p.juri2Total > 0 ? formatScore(p.juri2Total) : '-',
             penalty: p.totalPenalty > 0 ? `-${formatScore(p.totalPenalty)}` : '-',
             final: p.grandTotal > 0 ? formatScore(p.grandTotal) : '-',
+            average: p.isDisqualified ? '0' : (p.averageScore > 0 ? formatScore(p.averageScore) : '-'),
             disqualified: p.isDisqualified ? 'Ya - ' + p.disqualificationReason : '-'
           });
         });
@@ -2392,6 +2406,9 @@ export function AdminDashboard() {
                       <th className="px-2 py-2 font-medium text-center cursor-pointer hover:bg-slate-200 transition-colors select-none" onClick={() => handleRekapSort('grandTotal')} title="Urutkan Jumlah Nilai">
                         Jumlah {rekapSortConfig?.key === 'grandTotal' ? (rekapSortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
+                      <th className="px-2 py-2 font-medium text-center cursor-pointer hover:bg-slate-200 transition-colors select-none" onClick={() => handleRekapSort('averageScore')} title="Urutkan Nilai Rata-rata">
+                        Rata-rata {rekapSortConfig?.key === 'averageScore' ? (rekapSortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                      </th>
                       <th className="px-2 py-2 font-medium text-center rounded-tr-md cursor-pointer hover:bg-slate-200 transition-colors select-none" onClick={() => handleRekapSort('rank')} title="Urutkan Peringkat">
                         Rank {rekapSortConfig?.key === 'rank' ? (rekapSortConfig.direction === 'asc' ? '↑' : '↓') : ''}
                       </th>
@@ -2402,7 +2419,7 @@ export function AdminDashboard() {
                       <React.Fragment key={group.category}>
                         {group.participants.length > 0 && (
                           <tr className="bg-slate-100/50">
-                            <td colSpan={9} className="px-3 py-1.5 font-semibold text-slate-700 text-[10px] uppercase tracking-wider">
+                            <td colSpan={10} className="px-3 py-1.5 font-semibold text-slate-700 text-[10px] uppercase tracking-wider">
                               {group.category}
                             </td>
                           </tr>
@@ -2517,6 +2534,9 @@ export function AdminDashboard() {
                             <td className="px-2 py-1.5 text-center font-bold text-slate-900 text-base">
                               {p.isDisqualified ? <span className="text-red-500 text-sm">0</span> : formatScore(p.grandTotal)}
                             </td>
+                            <td className="px-2 py-1.5 text-center font-semibold text-blue-700 text-sm">
+                              {p.isDisqualified ? <span className="text-red-500 text-sm">0</span> : (p.averageScore > 0 ? formatScore(p.averageScore) : '-')}
+                            </td>
                             <td className="px-2 py-1.5 text-center">
                               {p.isDisqualified ? (
                                 <div className="flex flex-col items-center justify-center gap-1 group relative">
@@ -2544,7 +2564,7 @@ export function AdminDashboard() {
                     ))}
                     {filteredParticipants.length === 0 && (
                       <tr>
-                        <td colSpan={9} className="px-4 py-8 text-center text-slate-500">
+                        <td colSpan={10} className="px-4 py-8 text-center text-slate-500">
                           Tidak ada peserta yang ditemukan.
                         </td>
                       </tr>
