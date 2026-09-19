@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { db } from '../lib/firebase';
 import { collection, query, orderBy, onSnapshot, setDoc, doc, deleteDoc, updateDoc, limit, writeBatch, getDocs } from 'firebase/firestore';
@@ -1230,6 +1230,48 @@ export function AdminDashboard() {
     };
   });
 
+  // Rekap Nilai: Urutkan default sesuai nomor urut peserta, atau sesuai kolom yang dipilih via rekapSortConfig
+  const displayGroupedScores = useMemo(() => {
+    return groupedScores.map(group => {
+      const sorted = [...group.participants].sort((a, b) => {
+        if (!rekapSortConfig) {
+          // Default: Diurutkan sesuai nomor urut peserta
+          return (a.number || '').localeCompare(b.number || '', undefined, { numeric: true, sensitivity: 'base' });
+        }
+        const { key, direction } = rekapSortConfig;
+        let valA: any = a[key as keyof typeof a];
+        let valB: any = b[key as keyof typeof b];
+
+        // Normalisasi sorting
+        if (key === 'number') {
+          return direction === 'asc'
+            ? (a.number || '').localeCompare(b.number || '', undefined, { numeric: true, sensitivity: 'base' })
+            : (b.number || '').localeCompare(a.number || '', undefined, { numeric: true, sensitivity: 'base' });
+        }
+        if (key === 'name') {
+          return direction === 'asc'
+            ? (a.name || '').localeCompare(b.name || '', undefined, { sensitivity: 'base' })
+            : (b.name || '').localeCompare(a.name || '', undefined, { sensitivity: 'base' });
+        }
+        if (key === 'rank') {
+          const rankA = a.rank === '-' || a.rank === undefined ? 9999 : Number(a.rank);
+          const rankB = b.rank === '-' || b.rank === undefined ? 9999 : Number(b.rank);
+          return direction === 'asc' ? rankA - rankB : rankB - rankA;
+        }
+
+        // Nilai angka (p1Total, p2Total, p3Total, grandTotal, dll)
+        const numA = typeof valA === 'number' ? valA : 0;
+        const numB = typeof valB === 'number' ? valB : 0;
+        return direction === 'asc' ? numA - numB : numB - numA;
+      });
+
+      return {
+        ...group,
+        participants: sorted
+      };
+    });
+  }, [groupedScores, rekapSortConfig]);
+
   
   const exportDaftarPesertaExcel = async () => {
     try {
@@ -2332,17 +2374,31 @@ export function AdminDashboard() {
                         )}
                       </th>
                       <th className="px-2 py-2 font-medium text-center whitespace-nowrap text-slate-400 select-none">No. Urut</th>
-                      <th className="px-2 py-2 font-medium text-center whitespace-nowrap cursor-pointer hover:bg-slate-200 transition-colors select-none" onClick={() => handleRekapSort('number')} title="Urutkan No. Peserta">No. Peserta</th>
-                      <th className="px-2 py-2 font-medium text-center cursor-pointer hover:bg-slate-200 transition-colors select-none" onClick={() => handleRekapSort('name')} title="Urutkan Regu">Regu</th>
-                      <th className="px-2 py-2 font-medium text-center cursor-pointer hover:bg-slate-200 transition-colors select-none" onClick={() => handleRekapSort('p1Total')} title="Urutkan Nilai Juri 1">Juri 1</th>
-                      <th className="px-2 py-2 font-medium text-center cursor-pointer hover:bg-slate-200 transition-colors select-none" onClick={() => handleRekapSort('p2Total')} title="Urutkan Nilai Juri 2">Juri 2</th>
-                      <th className="px-2 py-2 font-medium text-center cursor-pointer hover:bg-slate-200 transition-colors select-none" onClick={() => handleRekapSort('p3Total')} title="Urutkan Total Penalti">Penalti</th>
-                      <th className="px-2 py-2 font-medium text-center cursor-pointer hover:bg-slate-200 transition-colors select-none" onClick={() => handleRekapSort('grandTotal')} title="Urutkan Jumlah Nilai">Jumlah</th>
-                      <th className="px-2 py-2 font-medium text-center rounded-tr-md cursor-pointer hover:bg-slate-200 transition-colors select-none" onClick={() => handleRekapSort('rank')} title="Urutkan Peringkat">Rank</th>
+                      <th className="px-2 py-2 font-medium text-center whitespace-nowrap cursor-pointer hover:bg-slate-200 transition-colors select-none" onClick={() => handleRekapSort('number')} title="Urutkan No. Peserta">
+                        No. Peserta {rekapSortConfig?.key === 'number' ? (rekapSortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                      </th>
+                      <th className="px-2 py-2 font-medium text-center cursor-pointer hover:bg-slate-200 transition-colors select-none" onClick={() => handleRekapSort('name')} title="Urutkan Regu">
+                        Regu {rekapSortConfig?.key === 'name' ? (rekapSortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                      </th>
+                      <th className="px-2 py-2 font-medium text-center cursor-pointer hover:bg-slate-200 transition-colors select-none" onClick={() => handleRekapSort('p1Total')} title="Urutkan Nilai Juri 1">
+                        Juri 1 {rekapSortConfig?.key === 'p1Total' ? (rekapSortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                      </th>
+                      <th className="px-2 py-2 font-medium text-center cursor-pointer hover:bg-slate-200 transition-colors select-none" onClick={() => handleRekapSort('p2Total')} title="Urutkan Nilai Juri 2">
+                        Juri 2 {rekapSortConfig?.key === 'p2Total' ? (rekapSortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                      </th>
+                      <th className="px-2 py-2 font-medium text-center cursor-pointer hover:bg-slate-200 transition-colors select-none" onClick={() => handleRekapSort('p3Total')} title="Urutkan Total Penalti">
+                        Penalti {rekapSortConfig?.key === 'p3Total' ? (rekapSortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                      </th>
+                      <th className="px-2 py-2 font-medium text-center cursor-pointer hover:bg-slate-200 transition-colors select-none" onClick={() => handleRekapSort('grandTotal')} title="Urutkan Jumlah Nilai">
+                        Jumlah {rekapSortConfig?.key === 'grandTotal' ? (rekapSortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                      </th>
+                      <th className="px-2 py-2 font-medium text-center rounded-tr-md cursor-pointer hover:bg-slate-200 transition-colors select-none" onClick={() => handleRekapSort('rank')} title="Urutkan Peringkat">
+                        Rank {rekapSortConfig?.key === 'rank' ? (rekapSortConfig.direction === 'asc' ? '↑' : '↓') : ''}
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {groupedScores.map(group => (
+                    {displayGroupedScores.map(group => (
                       <React.Fragment key={group.category}>
                         {group.participants.length > 0 && (
                           <tr className="bg-slate-100/50">
